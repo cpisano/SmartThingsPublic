@@ -14,10 +14,10 @@
  *
  */
 definition(
-    name: "Device Data Transport",
+    name: "Data Transport",
     namespace: "cpisano",
     author: "Christopher Pisano",
-    description: "Device Data Transport to a web url",
+    description: "Post things to a WebService",
     category: "SmartThings Labs",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
     iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
