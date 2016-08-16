@@ -27,7 +27,7 @@ definition(
 preferences {
    section("About") {
         paragraph "Please select the devices that should be under the watchful eye of {{ enter product name }}."
-        paragraph "Version 0.1.2a"
+        paragraph "Version 0.2.1sa"
     }
 	section("Battery") {
     	input "thebattery", "capability.battery", required: true, title: "Monitor Battery", multiple: true
@@ -51,9 +51,9 @@ preferences {
     	input "thesmoke", "capability.smokeDetector", title: "smoke", required: true, multiple: true
         //input "thecarbon", "capability.carbonMonoxideDetector", title: "carbon", required: true, multiple: true
   	}  
-  	section("Switch") {
-    	input "myswitch", "capability.switch", title: "switch", required: true, multiple: true
-  	}     
+  	// section("Switch") {
+   //  	input "myswitch", "capability.switch", title: "switch", required: true, multiple: true
+  	// }     
     section("Temperature Measurement:") {
         input "temperature", "capability.temperatureMeasurement", required: true, title: "Temperature Devices", multiple: true
     }
