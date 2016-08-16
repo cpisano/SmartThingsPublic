@@ -88,7 +88,7 @@ def registerDevices() {
     //     reportDevice('power', object);
     // }
 
-    powerstrip_meter.each { object =?
+    powerstrip_meter.each { object ->
         reportDevice('outlet', object)
 
     }
