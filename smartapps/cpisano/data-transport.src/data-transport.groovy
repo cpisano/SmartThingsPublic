@@ -54,6 +54,14 @@ preferences {
     section("Temperature Measurement:") {
         input "temperature", "capability.temperatureMeasurement", required: true, title: "Temperature Devices", multiple: true
     }
+    section("Delay between check (default 1 minutes") {
+        input "frequency", "number", title: "Number of minutes", description: "", required: false
+    }    
+    section("Via text message at this number (or via push notification if not specified") {
+        input("recipients", "contact", title: "Send notifications to") {
+            input "phone", "phone", title: "Phone number (optional)", required: false
+        }
+    }    
 }
 
 /**
@@ -90,6 +98,24 @@ def tickler(evt) {
     }   
     */
 }
+
+void sendMessage(msg)
+{
+    def minutes = (openThreshold != null && openThreshold != "") ? openThreshold : 10
+    //def msg = "${contact.displayName} has been left open for ${minutes} minutes."
+    log.info msg
+    if (location.contactBookEnabled) {
+        sendNotificationToContacts(msg, recipients)
+    }
+    else {
+        if (phone) {
+            sendSms phone, msg
+        } else {
+            sendPush msg
+        }
+    }
+}
+
 
 def installed() {
 	log.debug "Installed with settings: ${settings}"
