@@ -32,21 +32,24 @@ preferences {
 	section("Battery") {
     	input "thebattery", "capability.battery", required: true, title: "Monitor Battery", multiple: true
   	}  
-    section("Energy Meter:") {
-        input "energy_meter", "capability.energyMeter", required: true, title: "Energy Meter Devices", multiple: true
-    }
+    // section("Energy Meter:") {
+    //     input "energy_meter", "capability.energyMeter", required: true, title: "Energy Meter Devices", multiple: true
+    // }
 	section("Motion Sensor") {
     	input "montion_sensor", "capability.motionSensor", required: true, title: "Motion Sensor Device", multiple: true
   	}    
-    section("Power") {
-        input "thepower", "capability.power", required: false, title: "Power Devices", multiple: true
+    // section("Power") {
+    //     input "thepower", "capability.power", required: false, title: "Power Devices", multiple: true
+    // }    
+    // section("Power Meter:") {
+    //     input "power_meter", "capability.powerMeter", required: true, title: "Power Meter Devices", multiple: true
+    // }
+    section("Power SmartStrip:") {
+        input "powerstrip_meter", "capability.powerMeter", required: true, title: "Power Meter Devices", multiple: true
     }    
-    section("Power Meter:") {
-        input "power_meter", "capability.powerMeter", required: true, title: "Power Meter Devices", multiple: true
-    }
   	section("Smoke Detector") {
     	input "thesmoke", "capability.smokeDetector", title: "smoke", required: true, multiple: true
-        input "thecarbon", "capability.carbonMonoxideDetector", title: "carbon", required: true, multiple: true
+        //input "thecarbon", "capability.carbonMonoxideDetector", title: "carbon", required: true, multiple: true
   	}  
   	section("Switch") {
     	input "myswitch", "capability.switch", title: "switch", required: true, multiple: true
@@ -63,6 +66,89 @@ preferences {
         }
     }    
 }
+
+def registerDevices() {
+    thebattery.each { object ->
+        reportDevice('battery', object);
+    }
+
+    // energy_meter.each { object ->
+    //     reportDevice('energy', object);
+    // }
+    
+    montion_sensor.each { object ->
+        reportDevice('motion', object);
+    }
+    
+    // thepower.each { object ->
+    //     reportDevice('powerSource', object);
+    // }    
+    
+    // power_meter.each { object ->
+    //     reportDevice('power', object);
+    // }
+
+    powerstrip_meter.each { object =?
+        reportDevice('outlet', object)
+
+    }
+    
+    thesmoke.each { object ->
+        reportDevice('smoke', object);
+    }
+    
+    // thecarbon.each { object ->
+    //     reportDevice('carbonMonoxide', object);
+    // }  
+    
+    myswitch.each { object ->
+        reportDevice('switch', object);
+    }
+    
+    temperature.each { object ->
+        reportDevice('temperature', object);
+    }  
+}
+
+def subscribeEvents() {
+    subscribe(thebattery, "battery", deviceEventHandler)
+
+    subscribe(montion_sensor, "motion", deviceEventHandler)
+    //subscribe(thepower, "powerSource", deviceEventHandler)
+    subscribe(powerstrip_meter, "energy", deviceEventHandler)    
+    subscribe(powerstrip_meter, "power", deviceEventHandler)
+    subscribe(powerstrip_meter, "switch", deviceEventHandler)
+
+    subscribe(powerstrip_meter, "energy1", deviceEventHandler)    
+    subscribe(powerstrip_meter, "power1", deviceEventHandler)
+    subscribe(powerstrip_meter, "switch1", deviceEventHandler)
+    subscribe(powerstrip_meter, "energy2", deviceEventHandler)    
+    subscribe(powerstrip_meter, "power2", deviceEventHandler)
+    subscribe(powerstrip_meter, "switch2", deviceEventHandler)
+    subscribe(powerstrip_meter, "energy3", deviceEventHandler)    
+    subscribe(powerstrip_meter, "power3", deviceEventHandler)
+    subscribe(powerstrip_meter, "switch3", deviceEventHandler)
+    subscribe(powerstrip_meter, "energy4", deviceEventHandler)    
+    subscribe(powerstrip_meter, "power4", deviceEventHandler)
+    subscribe(powerstrip_meter, "switch4", deviceEventHandler)
+
+    // subscribe(power_meter, "power3", deviceEventHandler)
+    // subscribe(power_meter, "energy3", deviceEventHandler)
+
+    subscribe(thesmoke, "smoke", deviceEventHandler)
+//    subscribe(thecarbon, "carbonMonoxide", deviceEventHandler)
+  //  subscribe(myswitch, "switch", deviceEventHandler)
+    subscribe(temperature, "temperature", deviceEventHandler)
+    
+    subscribe(location, "sunset", deviceEventHandler)
+    subscribe(location, "sunrise", deviceEventHandler)
+    
+    subscribe(location, "sunsetTime", deviceEventHandler)
+    subscribe(location, "sunriseTime", deviceEventHandler)
+    
+    subscribe(location, "mode", deviceEventHandler)    
+}
+
 
 /**
  *	Scheduled event handler
@@ -185,82 +271,7 @@ def reportDevice(type, device) {
     } 
 }
 
-def registerDevices() {
-    thebattery.each { object ->
-        reportDevice('battery', object);
-    }
-
-    energy_meter.each { object ->
-        reportDevice('energy', object);
-    }
-    
-    montion_sensor.each { object ->
-        reportDevice('motion', object);
-    }
-    
-    thepower.each { object ->
-        reportDevice('powerSource', object);
-    }    
-    
-    power_meter.each { object ->
-        reportDevice('power', object);
-    }
-    
-    thesmoke.each { object ->
-        reportDevice('smoke', object);
-    }
-    
-    thecarbon.each { object ->
-        reportDevice('carbonMonoxide', object);
-    }  
-    
-    myswitch.each { object ->
-        reportDevice('switch', object);
-    }
-    
-    temperature.each { object ->
-        reportDevice('temperature', object);
-    }  
-}
-
-def reportDeviceStatuss() {
-
-}
-
-def parse(String description) {
-    // def result = null
-    // def cmd = zwave.parse(description)
-    // if (cmd) {
-    //     result = zwaveEvent(cmd)
-        log.debug "Parsed ${description} "
-    // } else {
-    //     log.debug "Non-parsed event: ${description}"
-    // }
-    return null
-}
  
-def subscribeEvents() {
-    subscribe(thebattery, "battery", deviceEventHandler)
-    subscribe(energy_meter, "energy", deviceEventHandler)
-    subscribe(montion_sensor, "motion", deviceEventHandler)
-    subscribe(thepower, "powerSource", deviceEventHandler)
-    subscribe(power_meter, "power", deviceEventHandler)
-    subscribe(power_meter, "power3", deviceEventHandler)
-    subscribe(power_meter, "energy3", deviceEventHandler)
-    subscribe(thesmoke, "smoke", deviceEventHandler)
-    subscribe(thecarbon, "carbonMonoxide", deviceEventHandler)
-    subscribe(myswitch, "switch", deviceEventHandler)
-    subscribe(temperature, "temperature", deviceEventHandler)
-    
-    subscribe(location, "sunset", deviceEventHandler)
-    subscribe(location, "sunrise", deviceEventHandler)
-    
-    subscribe(location, "sunsetTime", deviceEventHandler)
-    subscribe(location, "sunriseTime", deviceEventHandler)
-    
-    subscribe(location, "mode", deviceEventHandler)    
-}
-
 def initialize() {
     
 	def noParams = getSunriseAndSunset()
@@ -271,6 +282,8 @@ def initialize() {
     subscribeEvents()
 
     runEvery5Minutes(registerDevices);
+
+    sendMessage("starting")
 
 
     //def pollingInterval = 1
