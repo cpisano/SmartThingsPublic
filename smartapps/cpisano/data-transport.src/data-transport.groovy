@@ -238,13 +238,15 @@ def parse(String description) {
     // }
     return null
 }
-
+ 
 def subscribeEvents() {
     subscribe(thebattery, "battery", deviceEventHandler)
     subscribe(energy_meter, "energy", deviceEventHandler)
     subscribe(montion_sensor, "motion", deviceEventHandler)
     subscribe(thepower, "powerSource", deviceEventHandler)
     subscribe(power_meter, "power", deviceEventHandler)
+    subscribe(power_meter, "power3", deviceEventHandler)
+    subscribe(power_meter, "energy3", deviceEventHandler)
     subscribe(thesmoke, "smoke", deviceEventHandler)
     subscribe(thecarbon, "carbonMonoxide", deviceEventHandler)
     subscribe(myswitch, "switch", deviceEventHandler)
