@@ -227,6 +227,18 @@ def reportDeviceStatuss() {
 
 }
 
+def parse(String description) {
+    // def result = null
+    // def cmd = zwave.parse(description)
+    // if (cmd) {
+    //     result = zwaveEvent(cmd)
+        log.debug "Parsed ${description} "
+    // } else {
+    //     log.debug "Non-parsed event: ${description}"
+    // }
+    return null
+}
+
 def subscribeEvents() {
     subscribe(thebattery, "battery", deviceEventHandler)
     subscribe(energy_meter, "energy", deviceEventHandler)
