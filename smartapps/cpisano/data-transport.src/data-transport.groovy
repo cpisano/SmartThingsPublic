@@ -185,48 +185,49 @@ def reportDevice(type, device) {
     } 
 }
 
-def initialize() {
-    
-	def noParams = getSunriseAndSunset()
-    log.debug "sunrise with no parameters: ${noParams.sunrise}"
-	log.debug "sunset with no parameters: ${noParams.sunset}"
-    
+def registerDevices() {
     thebattery.each { object ->
-    	reportDevice('battery', object);
+        reportDevice('battery', object);
     }
 
     energy_meter.each { object ->
-    	reportDevice('energy', object);
+        reportDevice('energy', object);
     }
     
     montion_sensor.each { object ->
-    	reportDevice('motion', object);
+        reportDevice('motion', object);
     }
     
     thepower.each { object ->
-    	reportDevice('powerSource', object);
+        reportDevice('powerSource', object);
     }    
     
     power_meter.each { object ->
-    	reportDevice('power', object);
+        reportDevice('power', object);
     }
     
     thesmoke.each { object ->
-    	reportDevice('smoke', object);
+        reportDevice('smoke', object);
     }
     
     thecarbon.each { object ->
-    	reportDevice('carbonMonoxide', object);
+        reportDevice('carbonMonoxide', object);
     }  
     
     myswitch.each { object ->
-    	reportDevice('switch', object);
+        reportDevice('switch', object);
     }
     
     temperature.each { object ->
-    	reportDevice('temperature', object);
-    }     
-    
+        reportDevice('temperature', object);
+    }  
+}
+
+def reportDeviceStatuss() {
+
+}
+
+def subscribeEvents() {
     subscribe(thebattery, "battery", deviceEventHandler)
     subscribe(energy_meter, "energy", deviceEventHandler)
     subscribe(montion_sensor, "motion", deviceEventHandler)
@@ -237,13 +238,26 @@ def initialize() {
     subscribe(myswitch, "switch", deviceEventHandler)
     subscribe(temperature, "temperature", deviceEventHandler)
     
-	subscribe(location, "sunset", deviceEventHandler)
-	subscribe(location, "sunrise", deviceEventHandler)
+    subscribe(location, "sunset", deviceEventHandler)
+    subscribe(location, "sunrise", deviceEventHandler)
     
     subscribe(location, "sunsetTime", deviceEventHandler)
-	subscribe(location, "sunriseTime", deviceEventHandler)
+    subscribe(location, "sunriseTime", deviceEventHandler)
     
-    subscribe(location, "mode", deviceEventHandler)
+    subscribe(location, "mode", deviceEventHandler)    
+}
+
+def initialize() {
+    
+	def noParams = getSunriseAndSunset()
+    log.debug "sunrise with no parameters: ${noParams.sunrise}"
+	log.debug "sunset with no parameters: ${noParams.sunset}"
+       
+    registerDevices()
+    subscribeEvents()
+
+    runEvery5Minutes(registerDevices);
+
 
     //def pollingInterval = 1
     //def ticklerSchedule = "0 0/${pollingInterval} * * * ?"    
