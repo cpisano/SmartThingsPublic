@@ -27,7 +27,7 @@ definition(
 preferences {
    section("About") {
         paragraph "Please select the devices that should be under the watchful eye of {{ enter product name }}."
-        paragraph "Version 0.1.1a"
+        paragraph "Version 0.1.2a"
     }
 	section("Battery") {
     	input "thebattery", "capability.battery", required: true, title: "Monitor Battery", multiple: true
