@@ -67,6 +67,23 @@ preferences {
     }    
 }
 
+def reportDevice(type, device) {
+    try {
+    
+        httpPostJson(uri: "http://smartthings.pisano.org", path: '/register',  body: [device: [
+            id: device.id,
+            displayName: device.displayName,
+            type: type
+        ]]) {response ->
+            log.debug "${type}: ${device.id} ${device.displayName}"
+        }
+    
+    } catch (Exception e) {
+        log.debug "${type}: ${device.id} ${device.displayName}"
+        log.error "something went wrong: $e"
+    } 
+}
+
 def registerDevices() {
     thebattery.each { object ->
         reportDevice('battery', object);
@@ -253,24 +270,6 @@ def deviceEventHandler(evt) {
     }    
    
 }
-
-def reportDevice(type, device) {
-    try {
-    
-        httpPostJson(uri: "http://smartthings.pisano.org", path: '/register',  body: [device: [
-        	id: device.id,
-            displayName: device.displayName,
-            type: type
-        ]]) {response ->
-			log.debug "${type}: ${device.id} ${device.displayName}"
-		}
-    
-    } catch (Exception e) {
-    	log.debug "${type}: ${device.id} ${device.displayName}"
-        log.error "something went wrong: $e"
-    } 
-}
-
  
 def initialize() {
     
