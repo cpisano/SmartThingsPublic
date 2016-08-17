@@ -85,6 +85,8 @@ def reportDevice(type, device) {
 }
 
 def registerDevices() {
+    log.debug "apiServerUrl: ${getApiServerUrl()}"
+    
     thebattery.each { object ->
         reportDevice('battery', object);
     }
@@ -286,7 +288,7 @@ def initialize() {
     runEvery5Minutes(registerDevices);
 
     sendMessage("starting")
-    log.debug "apiServerUrl: ${getApiServerUrl()}"
+    
 
 
     //def pollingInterval = 1
