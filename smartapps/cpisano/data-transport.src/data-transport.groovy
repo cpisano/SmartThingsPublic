@@ -263,7 +263,7 @@ def deviceEventHandler(evt) {
             hub: evt.hubId,
             data: evt.data,
             zwave: evt.description,
-            description: evt.descriptiontext
+            description: evt.descriptionText
         ]]) {response ->
 			log.debug "POSTED"
 		}
