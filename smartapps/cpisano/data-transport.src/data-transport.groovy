@@ -94,7 +94,7 @@ def post(path, body) {
     try {
         
         httpPostJson(uri: "http://smartthings.pisano.org", path: path,  body: body) {response ->
-            log.debug "POSTED $path"
+            //log.debug "POSTED $path"
         }
     
     } catch (Exception e) {
@@ -128,7 +128,22 @@ def updateDeviceStatus() {
     thecontact.each { object ->
         //reportDevice('contact', object);
        // def currentTemperature = object.currentTemperature
+    // def currPower = power_meter.currentValue("power")
+    // def currEnergy = power_meter.currentValue("energy")       
         log.debug "${object.displayName}: ${object.currentTemperature}"
+
+      post('/event', [event: [
+                id: '',
+                date: toDateTime(),
+                name: 'temperature',
+                deviceId: object.id,
+                value: object.currentTemperature,
+                unit: '',
+                hub: '',
+                data: '',
+                zwave: '',
+                description: '${object.displayName} was ${object.currentTemperature}°F'
+            ]])        
 
     }  
 
@@ -152,18 +167,10 @@ def updateDeviceStatus() {
 
 def registerDevices() {
     log.debug "apiServerUrl: ${getApiServerUrl()}"
-    
-    // thebattery.each { object ->
-    //     reportDevice('battery', object);
-    // }
 
     thecontact.each { object ->
         reportDevice('contact', object);
     }    
-
-    // energy_meter.each { object ->
-    //     reportDevice('energy', object);
-    // }
     
     montion_sensor.each { object ->
         reportDevice('motion', object);
@@ -172,14 +179,6 @@ def registerDevices() {
     thepresence.each { object ->
         reportDevice('presence', object);
     }    
-    
-    // thepower.each { object ->
-    //     reportDevice('powerSource', object);
-    // }    
-    
-    // power_meter.each { object ->
-    //     reportDevice('power', object);
-    // }
 
     powerstrip_meter.each { object ->
         reportDevice('outlet', object)
@@ -189,18 +188,6 @@ def registerDevices() {
     thesmoke.each { object ->
         reportDevice('smoke', object);
     }
-    
-    // thecarbon.each { object ->
-    //     reportDevice('carbonMonoxide', object);
-    // }  
-    
-    // myswitch.each { object ->
-    //     reportDevice('switch', object);
-    // }
-    
-    // temperature.each { object ->
-    //     reportDevice('temperature', object);
-    // }  
 }
 
 def subscribeEvents() {
@@ -210,7 +197,6 @@ def subscribeEvents() {
     subscribe(montion_sensor, "temperature", deviceEventHandler)
     subscribe(montion_sensor, "battery", deviceEventHandler)
 
-    //subscribe(thepower, "powerSource", deviceEventHandler)
     subscribe(powerstrip_meter, "energy", deviceEventHandler)    
     subscribe(powerstrip_meter, "power", deviceEventHandler)
     subscribe(powerstrip_meter, "switch", deviceEventHandler)
@@ -237,14 +223,8 @@ def subscribeEvents() {
     
     subscribe(thepresence, "presence", deviceEventHandler)
 
-    // subscribe(power_meter, "power3", deviceEventHandler)
-    // subscribe(power_meter, "energy3", deviceEventHandler)
-
     subscribe(thesmoke, "smoke", deviceEventHandler)
     subscribe(thesmoke, "battery", deviceEventHandler)
-//    subscribe(thecarbon, "carbonMonoxide", deviceEventHandler)
-  //  subscribe(myswitch, "switch", deviceEventHandler)
-    //subscribe(temperature, "temperature", deviceEventHandler)
     
     subscribe(location, "sunset", deviceEventHandler)
     subscribe(location, "sunrise", deviceEventHandler)
@@ -253,42 +233,6 @@ def subscribeEvents() {
     subscribe(location, "sunriseTime", deviceEventHandler)
     
     subscribe(location, "mode", deviceEventHandler)    
-}
-
-
-/**
- *	Scheduled event handler
- *  
- *	Called at the specified interval to poll the metering switch.
- *	This keeps the device active otherwise the power events do not get sent
- *
- *	evt		The scheduler event (always null)
- */
-def tickler(evt) {
-    //power_meter.ping()
-
-    def currPower = power_meter.currentValue("power")
-    def currEnergy = power_meter.currentValue("energy")
-    
-    log.debug "-meterHandler display name: power meterValue: ${currPower}W   ${currEnergy}"
-    
-    def params = [
-        uri: "http://smartthings.pisano.org:81",
-        path: "/test"
-    ]
-/**
-    try {
-        httpGet(params) { resp ->
-            resp.headers.each {
-               log.debug "${it.name} : ${it.value}"
-            }
-            log.debug "response contentType: ${resp.contentType}"
-            log.debug "response data: ${resp.data}"
-        }
-    } catch (e) {
-        log.error "something went wrong: $e"
-    }   
-    */
 }
 
 void sendMessage(msg)
@@ -323,15 +267,6 @@ def updated() {
 }
 
 def deviceEventHandler(evt) {
-	// log.debug "DATA:        ${evt.data}"
- //    log.debug "SOURCE       ${evt.source}"    
- //    log.debug "HUB          ${evt.hubId}"
- //    log.debug "VALUE        ${evt.stringValue} ${evt.unit}"
- //    log.debug "             ${evt.deviceId}"
- //    log.debug "DEVICE       ${evt.device}"
- //    log.debug "             ${evt.displayName}"
- //    log.debug "NAME         ${evt.name}"
-	// log.debug "             ${evt.descriptionText}"
 	log.debug "DISCRIPTION: ${evt.descriptionText}"
     log.debug "DATE        ${evt.isoDate}"
 	log.debug "ID           ${evt.id}"    
