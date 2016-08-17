@@ -249,7 +249,7 @@ def deviceEventHandler(evt) {
  //    log.debug "NAME         ${evt.name}"
 	// log.debug "             ${evt.descriptionText}"
 	log.debug "DISCRIPTION: ${evt.descriptionText}"
-    log.debug "DATE        ${evt.dateValue}"
+    log.debug "DATE        ${evt.isoDate}"
 	log.debug "ID           ${evt.id}"    
     log.debug "EVENT - *************************************************************************"
 
