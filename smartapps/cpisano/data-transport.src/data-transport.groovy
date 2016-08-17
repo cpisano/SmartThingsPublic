@@ -136,7 +136,7 @@ def updateDeviceStatus() {
 
       post('/event', [event: [
                 id: '',
-                date: now.format("yyyy-MM-dd'T'HH:mm:ssZ", TimeZone.getTimeZone('UTC')),
+                date: now.format("yyyy-MM-dd'T'HH:mm:ss.S'Z'", TimeZone.getTimeZone('UTC')),
                 name: 'temperature',
                 deviceId: object.id,
                 value: object.currentTemperature,
