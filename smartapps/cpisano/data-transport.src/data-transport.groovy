@@ -27,7 +27,7 @@ definition(
 preferences {
    section("About") {
         paragraph "Please select the devices that should be under the watchful eye of {{ enter product name }}."
-        paragraph "Version 0.2.1sa"
+        paragraph "Version 0.2.2a"
     }
 	section("Battery") {
     	input "thebattery", "capability.battery", required: true, title: "Monitor Battery", multiple: true
@@ -139,12 +139,15 @@ def subscribeEvents() {
     subscribe(powerstrip_meter, "energy1", deviceEventHandler)    
     subscribe(powerstrip_meter, "power1", deviceEventHandler)
     subscribe(powerstrip_meter, "switch1", deviceEventHandler)
+
     subscribe(powerstrip_meter, "energy2", deviceEventHandler)    
     subscribe(powerstrip_meter, "power2", deviceEventHandler)
     subscribe(powerstrip_meter, "switch2", deviceEventHandler)
+
     subscribe(powerstrip_meter, "energy3", deviceEventHandler)    
     subscribe(powerstrip_meter, "power3", deviceEventHandler)
     subscribe(powerstrip_meter, "switch3", deviceEventHandler)
+
     subscribe(powerstrip_meter, "energy4", deviceEventHandler)    
     subscribe(powerstrip_meter, "power4", deviceEventHandler)
     subscribe(powerstrip_meter, "switch4", deviceEventHandler)
@@ -234,17 +237,17 @@ def updated() {
 }
 
 def deviceEventHandler(evt) {
-	log.debug "DATA:        ${evt.data}"
-    log.debug "SOURCE       ${evt.source}"    
-    log.debug "HUB          ${evt.hubId}"
-    log.debug "VALUE        ${evt.stringValue} ${evt.unit}"
-    log.debug "             ${evt.deviceId}"
-    log.debug "DEVICE       ${evt.device}"
-    log.debug "             ${evt.displayName}"
-    log.debug "NAME         ${evt.name}"
-	log.debug "             ${evt.descriptionText}"
-	log.debug "DISCRIPTION: ${evt.description}"
-    log.debug "DATE?        ${evt.dateValue instanceof Date} ${evt.isoDate}"
+	// log.debug "DATA:        ${evt.data}"
+ //    log.debug "SOURCE       ${evt.source}"    
+ //    log.debug "HUB          ${evt.hubId}"
+ //    log.debug "VALUE        ${evt.stringValue} ${evt.unit}"
+ //    log.debug "             ${evt.deviceId}"
+ //    log.debug "DEVICE       ${evt.device}"
+ //    log.debug "             ${evt.displayName}"
+ //    log.debug "NAME         ${evt.name}"
+	// log.debug "             ${evt.descriptionText}"
+	log.debug "DISCRIPTION: ${evt.descriptionText}"
+    log.debug "DATE        ${evt.dateValue}"
 	log.debug "ID           ${evt.id}"    
     log.debug "EVENT - *************************************************************************"
 
@@ -254,19 +257,19 @@ def deviceEventHandler(evt) {
         	id: evt.id,
             date: evt.isoDate,
             name: evt.name,
-            displayName: evt.displayName,
             deviceId: evt.deviceId,
             value: evt.stringValue,
             unit: evt.unit,
             hub: evt.hubId,
-            source: evt.source,
             data: evt.data,
+            zwave: evt.description,
+            description: evt.descriptiontext
         ]]) {response ->
 			log.debug "POSTED"
 		}
     
     } catch (Exception e) {
-        log.error "something went wrong: $e"
+        log.error "POSTED: $e"
     }    
    
 }
@@ -283,6 +286,7 @@ def initialize() {
     runEvery5Minutes(registerDevices);
 
     sendMessage("starting")
+    log.debug "apiServerUrl: ${getApiServerUrl()}"
 
 
     //def pollingInterval = 1
