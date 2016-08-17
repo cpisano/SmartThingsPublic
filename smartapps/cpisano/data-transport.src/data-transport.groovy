@@ -134,6 +134,8 @@ def updateDeviceStatus() {
 
 		def now = new Date()
 
+        def description = object.displayName + ' was ' + object.currentTemperature + '°F';
+
       post('/event', [event: [
                 id: '',
                 date: now.format("yyyy-MM-dd'T'HH:mm:ss.S'Z'", TimeZone.getTimeZone('UTC')),
@@ -144,7 +146,7 @@ def updateDeviceStatus() {
                 hub: '',
                 data: '',
                 zwave: '',
-                description: '${object.displayName} was ${object.currentTemperature}°F'
+                description: description
             ]])        
 
     }  
