@@ -27,7 +27,7 @@ definition(
 preferences {
    section("About") {
         paragraph "Please select the devices that should be under the watchful eye of {{ enter product name }}."
-        paragraph "Version 0.2.2a"
+        paragraph "Version 0.2.3a"
     }
 	// section("Battery") {
  //    	input "thebattery", "capability.battery", required: true, title: "Monitor Battery", multiple: true
@@ -57,9 +57,12 @@ preferences {
     section("Door Sensors") {
         input "thecontact", "capability.contactSensor", title: "select the doors", required: true, multiple: true
     }     
-    section("Temperature Measurement:") {
-        input "temperature", "capability.temperatureMeasurement", required: true, title: "Temperature Devices", multiple: true
-    }
+    //section("Temperature Measurement:") {
+    //    input "temperature", "capability.temperatureMeasurement", required: true, title: "Temperature Devices", multiple: true
+   // }
+	section("People") {
+    	input "presence", "capability.presenceSensor", title: "presence", required: true, multiple: true
+  	}    
     section("Delay between check (default 1 minutes") {
         input "frequency", "number", title: "Number of minutes", description: "", required: false
     }    
