@@ -27,7 +27,7 @@ definition(
 preferences {
    section("About") {
         paragraph "Please select the devices that should be under the watchful eye of {{ enter product name }}."
-        paragraph "Version 0.2.4a"
+        paragraph "Version 0.3.0a"
     }
 	// section("Battery") {
  //    	input "thebattery", "capability.battery", required: true, title: "Monitor Battery", multiple: true
@@ -44,7 +44,7 @@ preferences {
     // section("Power Meter:") {
     //     input "power_meter", "capability.powerMeter", required: true, title: "Power Meter Devices", multiple: true
     // }
-    section("Power SmartStrip:") {
+    section("Power Outlets:") {
         input "powerstrip_meter", "capability.powerMeter", required: true, title: "Power Meter Devices", multiple: true
     }    
   	section("Smoke Detector") {
@@ -63,31 +63,91 @@ preferences {
 	section("People") {
     	input "thepresence", "capability.presenceSensor", title: "presence", required: true, multiple: true
   	}    
-    section("Delay between check (default 1 minutes") {
-        input "frequency", "number", title: "Number of minutes", description: "", required: false
-    }    
-    section("Via text message at this number (or via push notification if not specified") {
-        input("recipients", "contact", title: "Send notifications to") {
-            input "phone", "phone", title: "Phone number (optional)", required: false
-        }
-    }    
+    // section("Delay between check (default 1 minutes") {
+    //     input "frequency", "number", title: "Number of minutes", description: "", required: false
+    // }    
+    // section("Via text message at this number (or via push notification if not specified") {
+    //     input("recipients", "contact", title: "Send notifications to") {
+    //         input "phone", "phone", title: "Phone number (optional)", required: false
+    //     }
+    // }    
 }
 
-def reportDevice(type, device) {
+def getDeviceArray() {
+
+}
+
+def getDevices() {
+
+    render contentType: "application/json", data: html, status: 200
+}
+
+mappings {
+  path("/devices") {
+    action: [
+      GET: "getDevices"
+    ]
+  }
+}
+
+def post(path, body) {
     try {
-    
-        httpPostJson(uri: "http://smartthings.pisano.org", path: '/register',  body: [device: [
-            id: device.id,
-            displayName: device.displayName,
-            type: type
-        ]]) {response ->
-            log.debug "${type}: ${device.id} ${device.displayName}"
+        
+        httpPostJson(uri: "http://smartthings.pisano.org", path: path,  body: body) {response ->
+            log.debug "POSTED $path"
         }
     
     } catch (Exception e) {
-        log.debug "${type}: ${device.id} ${device.displayName}"
-        log.error "something went wrong: $e"
-    } 
+        log.error "POSTED: $path $e"
+    }      
+}
+
+
+def reportDevice(type, device) {
+
+    log.debug "${type}: ${device.id} ${device.displayName}"
+
+    post('/register', [device: [
+            id: device.id,
+            displayName: device.displayName,
+            type: type
+        ]])
+    // try {
+    
+    //     httpPostJson(uri: "http://smartthings.pisano.org", path: '/register',  body: ) {response ->
+    //         log.debug "${type}: ${device.id} ${device.displayName}"
+    //     }
+    
+    // } catch (Exception e) {
+    //     log.debug "${type}: ${device.id} ${device.displayName}"
+    //     log.error "something went wrong: $e"
+    // } 
+}
+
+def updateDeviceStatus() {
+    thecontact.each { object ->
+        //reportDevice('contact', object);
+       // def currentTemperature = object.currentTemperature
+        log.debug "${object.displayName}: ${object.currentTemperature}"
+
+    }  
+
+    montion_sensor.each { object ->
+        //reportDevice('motion', object);
+    }
+    
+    thepresence.each { object ->
+        ///reportDevice('presence', object);
+    }  
+
+    powerstrip_meter.each { object ->
+        //reportDevice('outlet', object)
+
+    }
+    
+    thesmoke.each { object ->
+        //reportDevice('smoke', object);
+    }    
 }
 
 def registerDevices() {
@@ -134,13 +194,13 @@ def registerDevices() {
     //     reportDevice('carbonMonoxide', object);
     // }  
     
-    myswitch.each { object ->
-        reportDevice('switch', object);
-    }
+    // myswitch.each { object ->
+    //     reportDevice('switch', object);
+    // }
     
-    temperature.each { object ->
-        reportDevice('temperature', object);
-    }  
+    // temperature.each { object ->
+    //     reportDevice('temperature', object);
+    // }  
 }
 
 def subscribeEvents() {
@@ -277,10 +337,8 @@ def deviceEventHandler(evt) {
 	log.debug "ID           ${evt.id}"    
     log.debug "EVENT - *************************************************************************"
 
-    try {
-        
-        httpPostJson(uri: "http://smartthings.pisano.org", path: '/event',  body: [event: [
-        	id: evt.id,
+  post('/event', [event: [
+            id: evt.id,
             date: evt.isoDate,
             name: evt.name,
             deviceId: evt.deviceId,
@@ -290,13 +348,7 @@ def deviceEventHandler(evt) {
             data: evt.data,
             zwave: evt.description,
             description: evt.descriptionText
-        ]]) {response ->
-			log.debug "POSTED"
-		}
-    
-    } catch (Exception e) {
-        log.error "POSTED: $e"
-    }    
+        ]])
    
 }
  
@@ -310,6 +362,7 @@ def initialize() {
     subscribeEvents()
 
     runEvery5Minutes(registerDevices);
+    runEvery5Minutes(updateDeviceStatus);
 
     sendMessage("starting")
     
