@@ -27,7 +27,7 @@ definition(
 preferences {
    section("About") {
         paragraph "Please select the devices that should be under the watchful eye of {{ enter product name }}."
-        paragraph "Version 0.2.3a"
+        paragraph "Version 0.2.4a"
     }
 	// section("Battery") {
  //    	input "thebattery", "capability.battery", required: true, title: "Monitor Battery", multiple: true
@@ -61,7 +61,7 @@ preferences {
     //    input "temperature", "capability.temperatureMeasurement", required: true, title: "Temperature Devices", multiple: true
    // }
 	section("People") {
-    	input "presence", "capability.presenceSensor", title: "presence", required: true, multiple: true
+    	input "thepresence", "capability.presenceSensor", title: "presence", required: true, multiple: true
   	}    
     section("Delay between check (default 1 minutes") {
         input "frequency", "number", title: "Number of minutes", description: "", required: false
@@ -108,6 +108,10 @@ def registerDevices() {
     montion_sensor.each { object ->
         reportDevice('motion', object);
     }
+    
+    thepresence.each { object ->
+        reportDevice('presence', object);
+    }    
     
     // thepower.each { object ->
     //     reportDevice('powerSource', object);
@@ -170,6 +174,8 @@ def subscribeEvents() {
     subscribe(thecontact, "contact", deviceEventHandler)
     subscribe(thecontact, "temperature", deviceEventHandler)
     subscribe(thecontact, "battery", deviceEventHandler)
+    
+    subscribe(thepresence, "presence", deviceEventHandler)
 
     // subscribe(power_meter, "power3", deviceEventHandler)
     // subscribe(power_meter, "energy3", deviceEventHandler)
