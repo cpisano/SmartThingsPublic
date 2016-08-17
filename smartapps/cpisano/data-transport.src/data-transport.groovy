@@ -130,24 +130,24 @@ def updateDeviceStatus() {
        // def currentTemperature = object.currentTemperature
     // def currPower = power_meter.currentValue("power")
     // def currEnergy = power_meter.currentValue("energy")       
-        log.debug "${object.displayName}: ${object.currentTemperature}"
+  //       log.debug "${object.displayName}: ${object.currentTemperature}"
 
-		def now = new Date()
+		// def now = new Date()
 
-        def description = object.displayName + ' was ' + object.currentTemperature + '°F';
+  //       def description = object.displayName + ' was ' + object.currentTemperature + '°F';
 
-      post('/event', [event: [
-                id: '',
-                date: now.format("yyyy-MM-dd'T'HH:mm:ss.S'Z'", TimeZone.getTimeZone('UTC')),
-                name: 'temperature',
-                deviceId: object.id,
-                value: object.currentTemperature,
-                unit: '',
-                hub: '',
-                data: '',
-                zwave: '',
-                description: description
-            ]])        
+  //     post('/event', [event: [
+  //               id: '',
+  //               date: now.format("yyyy-MM-dd'T'HH:mm:ss.S'Z'", TimeZone.getTimeZone('UTC')),
+  //               name: 'temperature',
+  //               deviceId: object.id,
+  //               value: object.currentTemperature,
+  //               unit: '',
+  //               hub: '',
+  //               data: '',
+  //               zwave: '',
+  //               description: description
+  //           ]])        
 
     }  
 
@@ -156,11 +156,45 @@ def updateDeviceStatus() {
     }
     
     thepresence.each { object ->
-        ///reportDevice('presence', object);
+      //  log.debug "${object.displayName}: ${object.currentPresence}"
+
+      //   def now = new Date()
+
+      //   def description = object.displayName + ' was ' + object.currentPresence + '°F';
+
+      // post('/event', [event: [
+      //           id: '',
+      //           date: now.format("yyyy-MM-dd'T'HH:mm:ss.S'Z'", TimeZone.getTimeZone('UTC')),
+      //           name: 'presence',
+      //           deviceId: object.id,
+      //           value: object.currentPresence,
+      //           unit: '',
+      //           hub: '',
+      //           data: '',
+      //           zwave: '',
+      //           description: description
+      //       ]]) 
     }  
 
     powerstrip_meter.each { object ->
-        //reportDevice('outlet', object)
+      //  log.debug "${object.displayName}: ${object.Presence}"
+
+      //   def now = new Date()
+
+      //   def description = object.displayName + ' was ' + object.currentPresence + '°F';
+
+      // post('/event', [event: [
+      //           id: '',
+      //           date: now.format("yyyy-MM-dd'T'HH:mm:ss.S'Z'", TimeZone.getTimeZone('UTC')),
+      //           name: 'presence',
+      //           deviceId: object.id,
+      //           value: object.currentPresence,
+      //           unit: '',
+      //           hub: '',
+      //           data: '',
+      //           zwave: '',
+      //           description: description
+      //       ]]) 
 
     }
     
@@ -297,11 +331,12 @@ def initialize() {
     log.debug "sunrise with no parameters: ${noParams.sunrise}"
 	log.debug "sunset with no parameters: ${noParams.sunset}"
        
-    registerDevices()
-    subscribeEvents()
+   // registerDevices()
+   // subscribeEvents()
 
     runIn(1, registerDevices)
-   	runEvery1Hour(updateDeviceStatus);
+    runIn(1, subscribeEvents)
+   //	runEvery1Hour(updateDeviceStatus);
 
     sendMessage("starting")
     
