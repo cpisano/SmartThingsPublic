@@ -132,9 +132,11 @@ def updateDeviceStatus() {
     // def currEnergy = power_meter.currentValue("energy")       
         log.debug "${object.displayName}: ${object.currentTemperature}"
 
+		def now = new Date()
+
       post('/event', [event: [
                 id: '',
-                date: now.format("yyyy-MM-ddTHH:mm:ssZ", TimeZone.getTimeZone('UTC')),
+                date: now.format("yyyy-MM-dd'T'HH:mm:ssZ", TimeZone.getTimeZone('UTC')),
                 name: 'temperature',
                 deviceId: object.id,
                 value: object.currentTemperature,
@@ -296,8 +298,8 @@ def initialize() {
     registerDevices()
     subscribeEvents()
 
-    runEvery5Minutes(registerDevices);
-    runEvery5Minutes(updateDeviceStatus);
+    runIn(1, registerDevices)
+   	runEvery1Hour(updateDeviceStatus);
 
     sendMessage("starting")
     
