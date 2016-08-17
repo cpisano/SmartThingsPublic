@@ -29,9 +29,9 @@ preferences {
         paragraph "Please select the devices that should be under the watchful eye of {{ enter product name }}."
         paragraph "Version 0.2.2a"
     }
-	section("Battery") {
-    	input "thebattery", "capability.battery", required: true, title: "Monitor Battery", multiple: true
-  	}  
+	// section("Battery") {
+ //    	input "thebattery", "capability.battery", required: true, title: "Monitor Battery", multiple: true
+ //  	}  
     // section("Energy Meter:") {
     //     input "energy_meter", "capability.energyMeter", required: true, title: "Energy Meter Devices", multiple: true
     // }
@@ -53,7 +53,10 @@ preferences {
   	}  
   	// section("Switch") {
    //  	input "myswitch", "capability.switch", title: "switch", required: true, multiple: true
-  	// }     
+  	// }    
+    section("Door Sensors") {
+        input "thecontact", "capability.contactSensor", title: "select the doors", required: true, multiple: true
+    }     
     section("Temperature Measurement:") {
         input "temperature", "capability.temperatureMeasurement", required: true, title: "Temperature Devices", multiple: true
     }
@@ -87,9 +90,13 @@ def reportDevice(type, device) {
 def registerDevices() {
     log.debug "apiServerUrl: ${getApiServerUrl()}"
     
-    thebattery.each { object ->
-        reportDevice('battery', object);
-    }
+    // thebattery.each { object ->
+    //     reportDevice('battery', object);
+    // }
+
+    thecontact.each { object ->
+        reportDevice('contact', object);
+    }    
 
     // energy_meter.each { object ->
     //     reportDevice('energy', object);
@@ -130,9 +137,12 @@ def registerDevices() {
 }
 
 def subscribeEvents() {
-    subscribe(thebattery, "battery", deviceEventHandler)
+    
 
     subscribe(montion_sensor, "motion", deviceEventHandler)
+    subscribe(montion_sensor, "temperature", deviceEventHandler)
+    subscribe(montion_sensor, "battery", deviceEventHandler)
+
     //subscribe(thepower, "powerSource", deviceEventHandler)
     subscribe(powerstrip_meter, "energy", deviceEventHandler)    
     subscribe(powerstrip_meter, "power", deviceEventHandler)
@@ -154,13 +164,18 @@ def subscribeEvents() {
     subscribe(powerstrip_meter, "power4", deviceEventHandler)
     subscribe(powerstrip_meter, "switch4", deviceEventHandler)
 
+    subscribe(thecontact, "contact", deviceEventHandler)
+    subscribe(thecontact, "temperature", deviceEventHandler)
+    subscribe(thecontact, "battery", deviceEventHandler)
+
     // subscribe(power_meter, "power3", deviceEventHandler)
     // subscribe(power_meter, "energy3", deviceEventHandler)
 
     subscribe(thesmoke, "smoke", deviceEventHandler)
+    subscribe(thesmoke, "battery", deviceEventHandler)
 //    subscribe(thecarbon, "carbonMonoxide", deviceEventHandler)
   //  subscribe(myswitch, "switch", deviceEventHandler)
-    subscribe(temperature, "temperature", deviceEventHandler)
+    //subscribe(temperature, "temperature", deviceEventHandler)
     
     subscribe(location, "sunset", deviceEventHandler)
     subscribe(location, "sunrise", deviceEventHandler)
