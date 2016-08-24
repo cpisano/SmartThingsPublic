@@ -27,23 +27,11 @@ definition(
 preferences {
    section("About") {
         paragraph "Please select the devices that should be under the watchful eye of {{ enter product name }}."
-        paragraph "Version 0.3.0a"
+        paragraph "Version 0.4.2a"
     }
-	// section("Battery") {
- //    	input "thebattery", "capability.battery", required: true, title: "Monitor Battery", multiple: true
- //  	}  
-    // section("Energy Meter:") {
-    //     input "energy_meter", "capability.energyMeter", required: true, title: "Energy Meter Devices", multiple: true
-    // }
 	section("Motion Sensor") {
     	input "montion_sensor", "capability.motionSensor", required: true, title: "Motion Sensor Device", multiple: true
   	}    
-    // section("Power") {
-    //     input "thepower", "capability.power", required: false, title: "Power Devices", multiple: true
-    // }    
-    // section("Power Meter:") {
-    //     input "power_meter", "capability.powerMeter", required: true, title: "Power Meter Devices", multiple: true
-    // }
     section("Power Outlets:") {
         input "powerstrip_meter", "capability.powerMeter", required: true, title: "Power Meter Devices", multiple: true
     }    
@@ -51,26 +39,19 @@ preferences {
     	input "thesmoke", "capability.smokeDetector", title: "smoke", required: true, multiple: true
         //input "thecarbon", "capability.carbonMonoxideDetector", title: "carbon", required: true, multiple: true
   	}  
-  	// section("Switch") {
-   //  	input "myswitch", "capability.switch", title: "switch", required: true, multiple: true
-  	// }    
+  	section("Switch") {
+     	input "myswitch", "capability.switch", title: "switch", required: true, multiple: true
+  	 }    
     section("Door Sensors") {
         input "thecontact", "capability.contactSensor", title: "select the doors", required: true, multiple: true
     }     
-    //section("Temperature Measurement:") {
-    //    input "temperature", "capability.temperatureMeasurement", required: true, title: "Temperature Devices", multiple: true
-   // }
 	section("People") {
     	input "thepresence", "capability.presenceSensor", title: "presence", required: true, multiple: true
   	}    
-    // section("Delay between check (default 1 minutes") {
-    //     input "frequency", "number", title: "Number of minutes", description: "", required: false
-    // }    
-    // section("Via text message at this number (or via push notification if not specified") {
-    //     input("recipients", "contact", title: "Send notifications to") {
-    //         input "phone", "phone", title: "Phone number (optional)", required: false
-    //     }
-    // }    
+	section("Color") {
+    	input "color_control", "capability.colorControl", title: "presence", required: true, multiple: true
+  	}    
+
 }
 
 def getDeviceArray() {
@@ -122,6 +103,113 @@ def reportDevice(type, device) {
     //     log.debug "${type}: ${device.id} ${device.displayName}"
     //     log.error "something went wrong: $e"
     // } 
+}
+
+def textContainsAnyOf(text, keywords)
+{
+	def result = '';
+	for (int i = 0; i < keywords.size(); i++) {
+		result = text.contains(keywords[i])
+        if (result == true) return result
+	}
+    return result;
+}
+
+def parseForecast(json)
+{
+
+ 
+	def snowKeywords = ['snow','flurries','sleet']
+    def rainKeywords = ['rain', 'showers', 'sprinkles', 'precipitation']
+    def clearKeywords = ['clear']
+    def sunnyKeywords = ['sunny']
+    def hotKeywords = ['hot']
+    def cloudyKeywords = ['overcast','cloudy']
+    def result = '#000000';
+    
+    def rainColor = '#08088A';
+    def snowColor = '#00CCFF';
+    def clearColor = '#cccccc';
+    def sunnyColor = '#FFFF00';
+    def hotColor = '#FF3300';
+    def cloudyColor = '#4C4C4C';
+    
+    
+	def temperature = json?.current_observation.temp_f;
+    
+    def value = temperature.toInteger()
+     def now = new Date();
+     
+       post('/event', [event: [
+                 id: '',
+                 date: now.format("yyyy-MM-dd'T'HH:mm:ss.S'Z'", TimeZone.getTimeZone('UTC')),
+                 name: 'temperature',
+                 deviceId: '22af7a10-6a42-11e6-bdf4-0800200c9a66',
+                 value: value,
+                 unit: '',
+                 hub: '',
+                 data: '',
+                 zwave: '',
+                 description: json?.current_observation.temperature_string
+             ]])        
+    
+    log.debug value
+    
+    if (value > 0) {
+    	result = snowColor
+    }
+
+	if (value > 50) {
+    	result = clearColor
+    }
+    
+    if (value > 70) {
+    	result = sunnyColor
+    }
+
+
+    if (value > 80) {
+    	result = hotColor
+    }
+
+    
+    //.txt_forecast?.forecastday?.first()
+    /*
+	if (forecast) {
+		def text = forecast?.fcttext?.toLowerCase()
+        def day = forecast?.title
+        
+        log.debug text
+		if (text) {
+            if(textContainsAnyOf(text,cloudyKeywords)) result = cloudyColor
+			if(textContainsAnyOf(text,clearKeywords)) result = clearColor
+			if(textContainsAnyOf(text,sunnyKeywords)) result = sunnyColor
+            if(textContainsAnyOf(text,hotKeywords)) result = hotColor
+            if(textContainsAnyOf(text,rainKeywords)) result = rainColor
+            if(textContainsAnyOf(text,snowKeywords)) result = snowColor
+        }
+        log.debug "Weather for $day : $text"
+        log.debug "Setting weather lights to $result"
+    }
+    else
+    {
+    	 log.debug "Could not get weather!"
+    }
+    */
+    log.debug result
+    return result
+}
+
+def weatherCheck(evt) {
+
+	def response = getWeatherFeature("conditions", "21212")
+    def forecastColor = parseForecast(response)
+    log.debug "setting color to $forecastColor"
+   
+    color_control.each { 
+        it?.on()
+    	it?.setColor(forecastColor) 
+    }
 }
 
 def updateDeviceStatus() {
@@ -226,6 +314,10 @@ def registerDevices() {
     thesmoke.each { object ->
         reportDevice('smoke', object);
     }
+    
+    myswitch.each { object ->
+        reportDevice('switch', object);
+    }    
 }
 
 def subscribeEvents() {
@@ -234,6 +326,8 @@ def subscribeEvents() {
     subscribe(montion_sensor, "motion", deviceEventHandler)
     subscribe(montion_sensor, "temperature", deviceEventHandler)
     subscribe(montion_sensor, "battery", deviceEventHandler)
+    
+    subscribe(myswitch, "switch", deviceEventHandler)
 
     subscribe(powerstrip_meter, "energy", deviceEventHandler)    
     subscribe(powerstrip_meter, "power", deviceEventHandler)
@@ -336,9 +430,11 @@ def initialize() {
 
     runIn(1, registerDevices)
     runIn(1, subscribeEvents)
+    weatherCheck()
    //	runEvery1Hour(updateDeviceStatus);
+   runEvery1Hour(weatherCheck);
 
-    sendMessage("starting")
+    //sendMessage("starting")
     
 
 
