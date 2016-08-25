@@ -13,17 +13,327 @@
  *  for the specific language governing permissions and limitations under the License.
  *
  */
+
+import org.apache.commons.codec.binary.Base64
+import java.text.DecimalFormat
+import groovy.transform.Field
+
+@Field final USE_DEBUG = true
+@Field final selectedCapabilities = [ "actuator", "sensor" ]
+ 
+private getVendorName()       { "Pisanobot" }
+private getVendorIcon()       { "http://i.imgur.com/BjTfDYk.png" }
+private apiUrl()              { appSettings.apiUrl ?: "http://smartthings.pisano.org/" }
+private getVendorAuthPath()   { appSettings.vendorAuthPath ?: "http://smartthings.pisano.org/authorize" }
+private getVendorTokenPath()  { appSettings.vendorTokenPath ?: "http://smartthings.pisano.org/access_token" }
+ 
 definition(
     name: "Data Transport",
     namespace: "cpisano",
     author: "Christopher Pisano",
     description: "Post things to a WebService",
     category: "SmartThings Labs",
-    iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
-    iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
-    iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
+    iconUrl: "http://i.imgur.com/BjTfDYk.png",
+    iconX2Url: "http://i.imgur.com/BjTfDYk.png",
+    iconX3Url: "http://i.imgur.com/BjTfDYk.png")
+
+preferences {
+  page(name: "welcomePage")
+  page(name: "subscribePage")
+  page(name: "devicesPage")
+}
+
+mappings {
+  path("/oauthCode") {
+    action: [ GET: "getOauthCode" ]
+  }
+  path("/message") {
+    action: [ POST: "postMessage" ]
+  }
+  path("/app") {
+    action: [ POST: "postApp" ]
+  }
+}
+
+def welcomePage() {
+//  cleanUpTokens()
+
+  return dynamicPage(name: "welcomePage", nextPage: "subscribePage", uninstall: showUninstall) {
+    section {
+      paragraph title: "Welcome to the Octoblu SmartThings App!", "press 'Next' to continue"
+    }
+    /*
+    if (state.vendorDevices && state.vendorDevices.size()>0) {
+      section {
+        paragraph title: "My SmartThings in Octobu (${state.vendorDevices.size()}):", getDevInfo()
+      }
+    }
+    */
+    if (state.installed) {
+      section {
+        input name: "showUninstall", type: "bool", title: "Uninstall", submitOnChange: true
+        if (showUninstall) {
+          state.removeDevices = removeDevices
+          input name: "removeDevices", type: "bool", title: "Remove Octoblu devices", submitOnChange: true
+          paragraph title: "Sorry to see you go!", "please email <support@octoblu.com> with any feedback or issues"
+        }
+      }
+    }
+  }
+}
+
+def subscribePage() {
+
+createOAuthDevice() 
+
+  return dynamicPage(name: "subscribePage", title: "Subscribe to SmartThing devices", nextPage: "devicesPage") {
+    section {
+      // input name: "selectedCapabilities", type: "enum", title: "capability filter",
+      // submitOnChange: true, multiple: true, required: false, options: [ "actuator", "sensor" ]
+      for (capability in selectedCapabilities) {
+         input name: "${capability}Capability".toString(), type: "capability.$capability", title: "${capability.capitalize()} Things", multiple: true, required: false
+      }
+    }
+    section(" ") {
+      input name: "pleaseCreateAppDevice", type: "bool", title: "Create a SmartApp device", defaultValue: true
+      paragraph "A SmartApp device allows access to location and hub information for this installation"
+    }
+  }
+}
+
+// --------------------------------------
+def getDeviceInfo(device) {
+  return [
+    "id": device.id,
+    "displayName": device.displayName,
+  ]
+}
+
+def createDevices(smartDevices) {
+
+  smartDevices.each { smartDevice ->
+    def commands = [
+      [ "name": "app-get-value" ],
+      [ "name": "app-get-state" ],
+      [ "name": "app-get-device" ],
+      [ "name": "app-get-events" ]
+    ]
+
+    smartDevice.supportedCommands.each { command ->
+      if (command.arguments.size()>0) {
+        commands.push([ "name": command.name, "args": command.arguments ])
+      } else {
+        commands.push([ "name": command.name ])
+      }
+    }
+
+    log.debug "creating device for ${smartDevice.id}"
+
+    def schemas = [
+      "version": "2.0.0",
+      "message": [:]
+    ]
+
+    commands.each { command ->
+      schemas."message"."$command.name" = [
+        "type": "object",
+        "properties": [
+          "smartDeviceId": [
+            "type": "string",
+            "readOnly": true,
+            "default": "$smartDevice.id",
+            "x-schema-form": [
+            	"condition": "false"
+            ]
+          ],
+          "command": [
+            "type": "string",
+            "readOnly": true,
+            "default": "$command.name",
+            "enum": ["$command.name"],
+            "x-schema-form": [
+            	"condition": "false"
+            ]
+          ]
+        ]
+      ]
+
+      if (command.args) {
+        schemas."message"."$command.name"."properties"."args" = [
+          "type": "object",
+          "title": "Arguments",
+          "properties": [:]
+        ]
+
+        command.args.each { arg ->
+          def argLower = "$arg"
+          argLower = argLower.toLowerCase()
+          if (argLower == "color_map") {
+            schemas."message"."$command.name"."properties"."args"."properties"."$argLower" = [
+              "type": "object",
+              "properties": [
+                "hex": [
+                  "type": "string"
+                ],
+                "level": [
+                  "type": "number"
+                ]
+              ]
+            ]
+          } else {
+            schemas."message"."$command.name"."properties"."args"."properties"."$argLower" = [
+              "type": "$argLower"
+            ]
+          }
+        }
+      }
+    }
+
+    log.debug "UPDATED message schema: ${schemas}"
+
+    def deviceProperties = [
+      "schemas": schemas,
+      "needsSetup": false,
+      "online": true,
+      "name": "${smartDevice.displayName}",
+      "smartDeviceId": "${smartDevice.id}",
+      "logo": "https://i.imgur.com/TsXefbK.png",
+      "owner": "${state.vendorUuid}",
+      "configureWhitelist": [],
+      "discoverWhitelist": ["${state.vendorUuid}"],
+      "receiveWhitelist": [],
+      "sendWhitelist": [],
+      "type": "device:${smartDevice.name.replaceAll('\\s','-').toLowerCase()}",
+      "category": "smart-things",
+      "meshblu": [
+        "forwarders": [
+          "received": [[
+            "url": getApiServerUrl() + "/api/token/${state.accessToken}/smartapps/installations/${app.id}/message",
+            "method": "POST",
+            "type": "webhook"
+          ]]
+        ]
+      ]
+    ]
+
+   // updatePermissions(deviceProperties, smartDevice.id)
+    def params = [
+      uri: apiUrl() + "devices",
+      //headers: ["Authorization": "Bearer ${state.vendorBearerToken}"],
+      body: groovy.json.JsonOutput.toJson(deviceProperties)
+    ]
+
+    try {
+
+        log.debug "creating new device for ${smartDevice.id} ${smartDevice.name}"
+        httpPostJson(params) { response ->
+          //state.vendorDevices[smartDevice.id] = getDeviceInfo(response.data)
+        }
 
 
+    } catch (e) {
+      log.error "unable to create new device ${e}"
+    }
+  }
+}
+
+
+def devicesPage() {
+
+log.debug "devices"
+
+	state.vendorDevices = [:]
+
+
+
+  def hasDevice = [:]
+  hasDevice[app.id] = true
+  selectedCapabilities.each { capability ->
+    def smartDevices = settings["${capability}Capability"]
+    createDevices(smartDevices)
+    smartDevices.each { smartDevice ->
+      hasDevice[smartDevice.id] = true
+      //state.vendorDevices = [:]
+      state.vendorDevices[smartDevice.id] = getDeviceInfo(smartDevice)
+    }
+  }
+
+  /*
+  log.debug "getting url ${postParams.uri}"
+  try {
+    httpGet(postParams) { response ->
+      debug "devices json ${response.data.devices}"
+      response.data.devices.each { device ->
+        if (device.smartDeviceId && hasDevice[device.smartDeviceId]) {
+          debug "found device ${device.uuid} with smartDeviceId ${device.smartDeviceId}"
+          state.vendorDevices[device.smartDeviceId] = getDeviceInfo(device)
+        }
+        debug "has device: ${device.uuid} ${device.name} ${device.type}"
+      }
+    }
+  } catch (e) {
+    log.error "devices error ${e}"
+  }
+*/
+ // selectedCapabilities.each { capability ->
+ //   log.debug "checking devices for capability ${capability}"
+    //createDevices(settings["${capability}Capability"])
+  //}
+  //if (pleaseCreateAppDevice)
+   // createAppDevice()
+
+  return dynamicPage(name: "devicesPage", title: "Octoblu Things", install: true) {
+    section {
+      paragraph title: "Please press 'Done' to finish setup", "and subscribe to SmartThing events"
+     // paragraph title: "My Octoblu UUID:", "${state.vendorUuid}"
+     // paragraph title: "My SmartThings in Octobu (${state.vendorDevices.size()}):", getDevInfo()
+    }
+  }
+}
+
+def createOAuthDevice() {
+
+ def hub_id = null
+ def name = null
+ def type = null
+ 
+ location.hubs.each { object ->
+ 	hub_id = object.id
+    name = object.name
+    type = object.type
+ };
+ 
+  def oAuthDevice = [
+    "name": "SmartThings",
+    "owner": "4daabdf0-6b06-11e6-bdf4-0800200c9a66",
+    "type": "device:register",
+    "online": true,
+    "hub": [
+      "name": name,
+      "type": type,
+      "id": hub_id,
+      "imageUrl": "https://i.imgur.com/TsXefbK.png",
+      "callbackUrl": getApiServerUrl() 
+    ]
+  ]
+
+  def postParams = [ uri: apiUrl()+"devices",
+  body: groovy.json.JsonOutput.toJson(oAuthDevice)]
+
+  try {
+    httpPostJson(postParams) { response ->
+     log. debug "got new token for oAuth device ${response.data}"
+     //state.hub = response.data.uuid
+     // state.vendorOAuthToken = response.data.token
+    }
+  } catch (e) {
+    log.error "unable to create oAuth device: ${e}"
+  }
+
+}
+
+
+/*
 preferences {
    section("About") {
         paragraph "Please select the devices that should be under the watchful eye of {{ enter product name }}."
@@ -53,6 +363,7 @@ preferences {
   	}    
 
 }
+*/
 
 def getDeviceArray() {
 
@@ -115,6 +426,24 @@ def textContainsAnyOf(text, keywords)
     return result;
 }
 
+def postEvent(name, device, value, description)
+{
+     def now = new Date();
+     
+       post('/event', [event: [
+                 id: '',
+                 date: now.format("yyyy-MM-dd'T'HH:mm:ss.S'Z'", TimeZone.getTimeZone('UTC')),
+                 name: name,
+                 deviceId: device,
+                 value: value,
+                 unit: '',
+                 hub: '',
+                 data: '',
+                 zwave: '',
+                 description: description
+             ]]) 
+}
+
 def parseForecast(json)
 {
 
@@ -138,20 +467,8 @@ def parseForecast(json)
 	def temperature = json?.current_observation.temp_f;
     
     def value = temperature.toInteger()
-     def now = new Date();
-     
-       post('/event', [event: [
-                 id: '',
-                 date: now.format("yyyy-MM-dd'T'HH:mm:ss.S'Z'", TimeZone.getTimeZone('UTC')),
-                 name: 'temperature',
-                 deviceId: '22af7a10-6a42-11e6-bdf4-0800200c9a66',
-                 value: value,
-                 unit: '',
-                 hub: '',
-                 data: '',
-                 zwave: '',
-                 description: json?.current_observation.temperature_string
-             ]])        
+    postEvent('temperature', '22af7a10-6a42-11e6-bdf4-0800200c9a66', value, json?.current_observation.temperature_string)
+       
     
     log.debug value
     
@@ -164,13 +481,15 @@ def parseForecast(json)
     }
     
     if (value > 70) {
-    	result = sunnyColor
+    	result = snowColor
     }
 
 
     if (value > 80) {
-    	result = hotColor
+    	result = snowColor
     }
+    
+    result = "#FFFA00";
 
     
     //.txt_forecast?.forecastday?.first()
@@ -204,11 +523,24 @@ def weatherCheck(evt) {
 
 	def response = getWeatherFeature("conditions", "21212")
     def forecastColor = parseForecast(response)
-    log.debug "setting color to $forecastColor"
+    //log.debug "setting color to $forecastColor"
    
-    color_control.each { 
-        it?.on()
-    	it?.setColor(forecastColor) 
+    color_control.each { object ->
+    
+    	log.debug "${object.displayName} ${object.currentSwitch} ${forecastColor}"
+        object.on()
+        
+            def hueColor = 75
+    		def saturation = 100
+            
+def newValue = [hue: hueColor, saturation: saturation, level: 100]  
+	log.debug "new value = $newValue"
+
+	object.setColor(newValue)            
+    
+      //  object.setHue(100)
+       // object.setSaturation(100)
+    //	object.setColor(forecastColor) 
     }
 }
 
@@ -384,7 +716,6 @@ void sendMessage(msg)
     }
 }
 
-
 def installed() {
 	log.debug "Installed with settings: ${settings}"
     
@@ -392,31 +723,68 @@ def installed() {
 }
 
 def updated() {
-	log.debug "Updated with settings: ${settings}"
-
-	unsubscribe()
-	initialize()
+  unsubscribe()
+  log.debug "Updated with settings: ${settings}"
+  def subscribed = [:]
+  selectedCapabilities.each{ capability ->
+    settings."${capability}Capability".each { thing ->
+      if (subscribed[thing.id]) {
+        return
+      }
+      subscribed[thing.id] = true
+      thing.supportedAttributes.each { attribute ->
+        log.debug "subscribe to attribute ${attribute.name}"
+        subscribe thing, attribute.name, deviceEventHandler
+      }
+      thing.supportedCommands.each { command ->
+        log.debug "subscribe to command ${command.name}"
+        subscribeToCommand thing, command.name, deviceEventHandler
+      }
+      log.debug "subscribed to thing ${thing.id}"
+    }
+  }
+  initialize()
 }
+
 
 def deviceEventHandler(evt) {
 	log.debug "DISCRIPTION: ${evt.descriptionText}"
     log.debug "DATE        ${evt.isoDate}"
 	log.debug "ID           ${evt.id}"    
     log.debug "EVENT - *************************************************************************"
+    
+    def deviceid = evt.deviceId
+    
+    if (evt.name == 'sunrise') {
+    	deviceid = 'e5415490-6ace-11e6-bdf4-0800200c9a66'
+      }
+        
+    if (evt.name == 'sunset') {
+    	deviceid = 'f0beeb70-6ace-11e6-bdf4-0800200c9a66'        
+       }
 
-  post('/event', [event: [
-            id: evt.id,
-            date: evt.isoDate,
-            name: evt.name,
-            deviceId: evt.deviceId,
-            value: evt.stringValue,
-            unit: evt.unit,
-            hub: evt.hubId,
-            data: evt.data,
-            zwave: evt.description,
-            description: evt.descriptionText
-        ]])
-   
+      post('/event', [event: [
+        "date" : evt.isoDate,
+        "id" : evt.id,
+        "data" : evt.data,
+        "description" : evt.description,
+        "descriptionText" : evt.descriptionText,
+        "displayName" : evt.displayName,
+        "deviceId" : evt.deviceId,
+        "hubId" : evt.hubId,
+        "installedSmartAppId" : evt.installedSmartAppId,
+        "isoDate" : evt.isoDate,
+        "isDigital" : evt.isDigital(),
+        "isPhysical" : evt.isPhysical(),
+        "isStateChange" : evt.isStateChange(),
+        "locationId" : evt.locationId,
+        "name" : evt.name,
+        "source" : evt.source,
+        "unit" : evt.unit,
+        "value" : evt.value,
+        "category" : "event",
+        "type" : "device:smart-thing"
+      ]])
 }
  
 def initialize() {
