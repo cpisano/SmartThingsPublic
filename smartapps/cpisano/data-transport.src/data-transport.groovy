@@ -53,6 +53,13 @@ mappings {
   path("/app") {
     action: [ POST: "postApp" ]
   }
+  path("/ping") {
+    action: [ GET: "getPing" ]
+  }
+}
+
+def getPing() {
+  return ["pong"]
 }
 
 def welcomePage() {
@@ -62,13 +69,6 @@ def welcomePage() {
     section {
       paragraph title: "Welcome to the Octoblu SmartThings App!", "press 'Next' to continue"
     }
-    /*
-    if (state.vendorDevices && state.vendorDevices.size()>0) {
-      section {
-        paragraph title: "My SmartThings in Octobu (${state.vendorDevices.size()}):", getDevInfo()
-      }
-    }
-    */
     if (state.installed) {
       section {
         input name: "showUninstall", type: "bool", title: "Uninstall", submitOnChange: true
@@ -97,6 +97,97 @@ createOAuthDevice()
     section(" ") {
       input name: "pleaseCreateAppDevice", type: "bool", title: "Create a SmartApp device", defaultValue: true
       paragraph "A SmartApp device allows access to location and hub information for this installation"
+    }
+  }
+}
+
+def postMessage() {
+  debug("received message data ${request.JSON}")
+  def foundDevice = false
+  selectedCapabilities.each{ capability ->
+    settings."${capability}Capability".each { thing ->
+      if (!foundDevice && thing.id == request.JSON.smartDeviceId) {
+        def vendorDevice = state.vendorDevices[thing.id]
+        foundDevice = true
+        if (vendorDevice.uuid == request.JSON.fromUuid) {
+          log.error "aborting message from self"
+          return
+        }
+
+        if (!request.JSON.command.startsWith("app-")) {
+          def args = []
+          if (request.JSON.args) {
+            request.JSON.args.each { k, v ->
+              args.push(v)
+            }
+          }
+
+          debug "command being sent: ${request.JSON.command}\targs to be sent: ${args}"
+          thing."${request.JSON.command}"(*args)
+        } else {
+          debug "calling internal command ${request.JSON.command}"
+          def commandData = [:]
+          switch (request.JSON.command) {
+            case "app-get-value":
+              debug "got command value"
+              thing.supportedAttributes.each { attribute ->
+                commandData[attribute.name] = thing.latestValue(attribute.name)
+              }
+              break
+            case "app-get-state":
+              debug "got command state"
+              thing.supportedAttributes.each { attribute ->
+                commandData[attribute.name] = thing.latestState(attribute.name)?.value
+              }
+              break
+            case "app-get-device":
+              debug "got command device"
+              commandData = [
+                "id" : thing.id,
+                "displayName" : thing.displayName,
+                "name" : thing.name,
+                "label" : thing.label,
+                "capabilities" : thing.capabilities.collect{ thingCapability -> return thingCapability.name },
+                "supportedAttributes" : thing.supportedAttributes.collect{ attribute -> return attribute.name },
+                "supportedCommands" : thing.supportedCommands.collect{ command -> return ["name" : command.name, "arguments" : command.arguments ] }
+              ]
+              break
+            case "app-get-events":
+              debug "got command events"
+              commandData.events = []
+              thing.events().each { event ->
+                commandData.events.push(getEventData(event))
+              }
+              break
+            default:
+              commandData.error = "unknown command"
+              debug "unknown command ${request.JSON.command}"
+          }
+          
+          commandData.command = request.JSON.command
+          debug "with vendorDevice ${vendorDevice} for ${groovy.json.JsonOutput.toJson(commandData)}"
+
+          /*
+          def postParams = [
+            uri: apiUrl() + "messages",
+            headers: ["meshblu_auth_uuid": vendorDevice.uuid, "meshblu_auth_token": vendorDevice.token],
+            body: groovy.json.JsonOutput.toJson([ "devices" : [ "*" ], "payload" : commandData ])
+          ]
+
+          debug "posting params ${postParams}"
+
+          try {
+            debug "calling httpPostJson!"
+            httpPostJson(postParams) { response ->
+              debug "sent off command result"
+            }
+          } catch (e) {
+            log.error "unable to send command result ${e}"
+          }
+          */
+
+        }
+      }
     }
   }
 }
@@ -143,7 +234,7 @@ def createDevices(smartDevices) {
             "readOnly": true,
             "default": "$smartDevice.id",
             "x-schema-form": [
-            	"condition": "false"
+              "condition": "false"
             ]
           ],
           "command": [
@@ -152,7 +243,7 @@ def createDevices(smartDevices) {
             "default": "$command.name",
             "enum": ["$command.name"],
             "x-schema-form": [
-            	"condition": "false"
+              "condition": "false"
             ]
           ]
         ]
@@ -242,7 +333,7 @@ def devicesPage() {
 
 log.debug "devices"
 
-	state.vendorDevices = [:]
+  state.vendorDevices = [:]
 
 
 
@@ -298,7 +389,7 @@ def createOAuthDevice() {
  def type = null
  
  location.hubs.each { object ->
- 	hub_id = object.id
+  hub_id = object.id
     name = object.name
     type = object.type
  };
@@ -332,39 +423,6 @@ def createOAuthDevice() {
 
 }
 
-
-/*
-preferences {
-   section("About") {
-        paragraph "Please select the devices that should be under the watchful eye of {{ enter product name }}."
-        paragraph "Version 0.4.2a"
-    }
-	section("Motion Sensor") {
-    	input "montion_sensor", "capability.motionSensor", required: true, title: "Motion Sensor Device", multiple: true
-  	}    
-    section("Power Outlets:") {
-        input "powerstrip_meter", "capability.powerMeter", required: true, title: "Power Meter Devices", multiple: true
-    }    
-  	section("Smoke Detector") {
-    	input "thesmoke", "capability.smokeDetector", title: "smoke", required: true, multiple: true
-        //input "thecarbon", "capability.carbonMonoxideDetector", title: "carbon", required: true, multiple: true
-  	}  
-  	section("Switch") {
-     	input "myswitch", "capability.switch", title: "switch", required: true, multiple: true
-  	 }    
-    section("Door Sensors") {
-        input "thecontact", "capability.contactSensor", title: "select the doors", required: true, multiple: true
-    }     
-	section("People") {
-    	input "thepresence", "capability.presenceSensor", title: "presence", required: true, multiple: true
-  	}    
-	section("Color") {
-    	input "color_control", "capability.colorControl", title: "presence", required: true, multiple: true
-  	}    
-
-}
-*/
-
 def getDeviceArray() {
 
 }
@@ -372,14 +430,6 @@ def getDeviceArray() {
 def getDevices() {
 
     render contentType: "application/json", data: html, status: 200
-}
-
-mappings {
-  path("/devices") {
-    action: [
-      GET: "getDevices"
-    ]
-  }
 }
 
 def post(path, body) {
@@ -418,11 +468,11 @@ def reportDevice(type, device) {
 
 def textContainsAnyOf(text, keywords)
 {
-	def result = '';
-	for (int i = 0; i < keywords.size(); i++) {
-		result = text.contains(keywords[i])
+  def result = '';
+  for (int i = 0; i < keywords.size(); i++) {
+    result = text.contains(keywords[i])
         if (result == true) return result
-	}
+  }
     return result;
 }
 
@@ -448,7 +498,7 @@ def parseForecast(json)
 {
 
  
-	def snowKeywords = ['snow','flurries','sleet']
+  def snowKeywords = ['snow','flurries','sleet']
     def rainKeywords = ['rain', 'showers', 'sprinkles', 'precipitation']
     def clearKeywords = ['clear']
     def sunnyKeywords = ['sunny']
@@ -464,7 +514,7 @@ def parseForecast(json)
     def cloudyColor = '#4C4C4C';
     
     
-	def temperature = json?.current_observation.temp_f;
+  def temperature = json?.current_observation.temp_f;
     
     def value = temperature.toInteger()
     postEvent('temperature', '22af7a10-6a42-11e6-bdf4-0800200c9a66', value, json?.current_observation.temperature_string)
@@ -473,20 +523,20 @@ def parseForecast(json)
     log.debug value
     
     if (value > 0) {
-    	result = snowColor
+      result = snowColor
     }
 
-	if (value > 50) {
-    	result = clearColor
+  if (value > 50) {
+      result = clearColor
     }
     
     if (value > 70) {
-    	result = snowColor
+      result = snowColor
     }
 
 
     if (value > 80) {
-    	result = snowColor
+      result = snowColor
     }
     
     result = "#FFFA00";
@@ -494,15 +544,15 @@ def parseForecast(json)
     
     //.txt_forecast?.forecastday?.first()
     /*
-	if (forecast) {
-		def text = forecast?.fcttext?.toLowerCase()
+  if (forecast) {
+    def text = forecast?.fcttext?.toLowerCase()
         def day = forecast?.title
         
         log.debug text
-		if (text) {
+    if (text) {
             if(textContainsAnyOf(text,cloudyKeywords)) result = cloudyColor
-			if(textContainsAnyOf(text,clearKeywords)) result = clearColor
-			if(textContainsAnyOf(text,sunnyKeywords)) result = sunnyColor
+      if(textContainsAnyOf(text,clearKeywords)) result = clearColor
+      if(textContainsAnyOf(text,sunnyKeywords)) result = sunnyColor
             if(textContainsAnyOf(text,hotKeywords)) result = hotColor
             if(textContainsAnyOf(text,rainKeywords)) result = rainColor
             if(textContainsAnyOf(text,snowKeywords)) result = snowColor
@@ -512,7 +562,7 @@ def parseForecast(json)
     }
     else
     {
-    	 log.debug "Could not get weather!"
+       log.debug "Could not get weather!"
     }
     */
     log.debug result
@@ -521,26 +571,26 @@ def parseForecast(json)
 
 def weatherCheck(evt) {
 
-	def response = getWeatherFeature("conditions", "21212")
+  def response = getWeatherFeature("conditions", "21212")
     def forecastColor = parseForecast(response)
     //log.debug "setting color to $forecastColor"
    
     color_control.each { object ->
     
-    	log.debug "${object.displayName} ${object.currentSwitch} ${forecastColor}"
+      log.debug "${object.displayName} ${object.currentSwitch} ${forecastColor}"
         object.on()
         
             def hueColor = 75
-    		def saturation = 100
+        def saturation = 100
             
 def newValue = [hue: hueColor, saturation: saturation, level: 100]  
-	log.debug "new value = $newValue"
+  log.debug "new value = $newValue"
 
-	object.setColor(newValue)            
+  object.setColor(newValue)            
     
       //  object.setHue(100)
        // object.setSaturation(100)
-    //	object.setColor(forecastColor) 
+    //  object.setColor(forecastColor) 
     }
 }
 
@@ -552,7 +602,7 @@ def updateDeviceStatus() {
     // def currEnergy = power_meter.currentValue("energy")       
   //       log.debug "${object.displayName}: ${object.currentTemperature}"
 
-		// def now = new Date()
+    // def now = new Date()
 
   //       def description = object.displayName + ' was ' + object.currentTemperature + '°F';
 
@@ -623,82 +673,6 @@ def updateDeviceStatus() {
     }    
 }
 
-def registerDevices() {
-    log.debug "apiServerUrl: ${getApiServerUrl()}"
-
-    thecontact.each { object ->
-        reportDevice('contact', object);
-    }    
-    
-    montion_sensor.each { object ->
-        reportDevice('motion', object);
-    }
-    
-    thepresence.each { object ->
-        reportDevice('presence', object);
-    }    
-
-    powerstrip_meter.each { object ->
-        reportDevice('outlet', object)
-
-    }
-    
-    thesmoke.each { object ->
-        reportDevice('smoke', object);
-    }
-    
-    myswitch.each { object ->
-        reportDevice('switch', object);
-    }    
-}
-
-def subscribeEvents() {
-    
-
-    subscribe(montion_sensor, "motion", deviceEventHandler)
-    subscribe(montion_sensor, "temperature", deviceEventHandler)
-    subscribe(montion_sensor, "battery", deviceEventHandler)
-    
-    subscribe(myswitch, "switch", deviceEventHandler)
-
-    subscribe(powerstrip_meter, "energy", deviceEventHandler)    
-    subscribe(powerstrip_meter, "power", deviceEventHandler)
-    subscribe(powerstrip_meter, "switch", deviceEventHandler)
-
-    subscribe(powerstrip_meter, "energy1", deviceEventHandler)    
-    subscribe(powerstrip_meter, "power1", deviceEventHandler)
-    subscribe(powerstrip_meter, "switch1", deviceEventHandler)
-
-    subscribe(powerstrip_meter, "energy2", deviceEventHandler)    
-    subscribe(powerstrip_meter, "power2", deviceEventHandler)
-    subscribe(powerstrip_meter, "switch2", deviceEventHandler)
-
-    subscribe(powerstrip_meter, "energy3", deviceEventHandler)    
-    subscribe(powerstrip_meter, "power3", deviceEventHandler)
-    subscribe(powerstrip_meter, "switch3", deviceEventHandler)
-
-    subscribe(powerstrip_meter, "energy4", deviceEventHandler)    
-    subscribe(powerstrip_meter, "power4", deviceEventHandler)
-    subscribe(powerstrip_meter, "switch4", deviceEventHandler)
-
-    subscribe(thecontact, "contact", deviceEventHandler)
-    subscribe(thecontact, "temperature", deviceEventHandler)
-    subscribe(thecontact, "battery", deviceEventHandler)
-    
-    subscribe(thepresence, "presence", deviceEventHandler)
-
-    subscribe(thesmoke, "smoke", deviceEventHandler)
-    subscribe(thesmoke, "battery", deviceEventHandler)
-    
-    subscribe(location, "sunset", deviceEventHandler)
-    subscribe(location, "sunrise", deviceEventHandler)
-    
-    subscribe(location, "sunsetTime", deviceEventHandler)
-    subscribe(location, "sunriseTime", deviceEventHandler)
-    
-    subscribe(location, "mode", deviceEventHandler)    
-}
-
 void sendMessage(msg)
 {
     def minutes = (openThreshold != null && openThreshold != "") ? openThreshold : 10
@@ -717,9 +691,9 @@ void sendMessage(msg)
 }
 
 def installed() {
-	log.debug "Installed with settings: ${settings}"
-    
-	initialize()
+  log.debug "Installed with settings: ${settings}"
+  state.installed = true;
+  initialize()
 }
 
 def updated() {
@@ -727,7 +701,7 @@ def updated() {
   log.debug "Updated with settings: ${settings}"
   def subscribed = [:]
   selectedCapabilities.each{ capability ->
-    settings."${capability}Capability".each { thing ->
+      settings."${capability}Capability".each { thing ->
       if (subscribed[thing.id]) {
         return
       }
@@ -748,58 +722,57 @@ def updated() {
 
 
 def deviceEventHandler(evt) {
-	log.debug "DISCRIPTION: ${evt.descriptionText}"
-    log.debug "DATE        ${evt.isoDate}"
-	log.debug "ID           ${evt.id}"    
-    log.debug "EVENT - *************************************************************************"
-    
-    def deviceid = evt.deviceId
-    
-    if (evt.name == 'sunrise') {
-    	deviceid = 'e5415490-6ace-11e6-bdf4-0800200c9a66'
-      }
-        
-    if (evt.name == 'sunset') {
-    	deviceid = 'f0beeb70-6ace-11e6-bdf4-0800200c9a66'        
-       }
+  log.debug "DISCRIPTION: ${evt.descriptionText}"
+  log.debug "DATE         ${evt.isoDate}"
+  log.debug "ID           ${evt.id}"    
+  log.debug "EVENT - *************************************************************************"
 
-      post('/event', [event: [
-        "date" : evt.isoDate,
-        "id" : evt.id,
-        "data" : evt.data,
-        "description" : evt.description,
-        "descriptionText" : evt.descriptionText,
-        "displayName" : evt.displayName,
-        "deviceId" : evt.deviceId,
-        "hubId" : evt.hubId,
-        "installedSmartAppId" : evt.installedSmartAppId,
-        "isoDate" : evt.isoDate,
-        "isDigital" : evt.isDigital(),
-        "isPhysical" : evt.isPhysical(),
-        "isStateChange" : evt.isStateChange(),
-        "locationId" : evt.locationId,
-        "name" : evt.name,
-        "source" : evt.source,
-        "unit" : evt.unit,
-        "value" : evt.value,
-        "category" : "event",
-        "type" : "device:smart-thing"
-      ]])
+  def deviceid = evt.deviceId
+
+  if (evt.name == 'sunrise') {
+    deviceid = 'e5415490-6ace-11e6-bdf4-0800200c9a66'
+  }
+
+  if (evt.name == 'sunset') {
+    deviceid = 'f0beeb70-6ace-11e6-bdf4-0800200c9a66'        
+  }
+
+  post('/event', [event: [
+      "date" : evt.isoDate,
+      "id" : evt.id,
+      "data" : evt.data,
+      "description" : evt.description,
+      "descriptionText" : evt.descriptionText,
+      "displayName" : evt.displayName,
+      "deviceId" : evt.deviceId,
+      "hubId" : evt.hubId,
+      "installedSmartAppId" : evt.installedSmartAppId,
+      "isoDate" : evt.isoDate,
+      "isDigital" : evt.isDigital(),
+      "isPhysical" : evt.isPhysical(),
+      "isStateChange" : evt.isStateChange(),
+      "locationId" : evt.locationId,
+      "name" : evt.name,
+      "source" : evt.source,
+      "unit" : evt.unit,
+      "value" : evt.value,
+      "category" : "event",
+      "type" : "device:smart-thing"
+    ]])
 }
  
 def initialize() {
     
-	def noParams = getSunriseAndSunset()
+  def noParams = getSunriseAndSunset()
     log.debug "sunrise with no parameters: ${noParams.sunrise}"
-	log.debug "sunset with no parameters: ${noParams.sunset}"
+  log.debug "sunset with no parameters: ${noParams.sunset}"
        
    // registerDevices()
    // subscribeEvents()
 
-    runIn(1, registerDevices)
-    runIn(1, subscribeEvents)
+
     weatherCheck()
-   //	runEvery1Hour(updateDeviceStatus);
+   // runEvery1Hour(updateDeviceStatus);
    runEvery1Hour(weatherCheck);
 
     //sendMessage("starting")
