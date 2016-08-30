@@ -82,6 +82,37 @@ def welcomePage() {
   }
 }
 
+/*
+    run a function at sunrise and sunset
+*/
+def checkSun() {
+    // TODO: Use location information if zip is not provided
+    def zip     = settings.zip as String
+    def sunInfo = getSunriseAndSunset(zipCode: zip)
+    def current = now()
+
+    if(sunInfo.sunrise.time > current ||
+        sunInfo.sunset.time  < current) {
+        state.sunMode = "sunset"
+    }
+    else {
+        state.sunMode = "sunrise"
+    }
+
+    log.info("Sunset: ${sunInfo.sunset.time}")
+    log.info("Sunrise: ${sunInfo.sunrise.time}")
+    log.info("Current: ${current}")
+    log.info("sunMode: ${state.sunMode}")
+
+    if(current < sunInfo.sunrise.time) {
+        runIn(((sunInfo.sunrise.time - current) / 1000).toInteger(), setSunrise)
+    }
+
+    if(current < sunInfo.sunset.time) {
+        runIn(((sunInfo.sunset.time - current) / 1000).toInteger(), setSunset)
+    }
+}
+
 def subscribePage() {
 
 createOAuthDevice() 
@@ -163,7 +194,7 @@ def postMessage() {
               commandData.error = "unknown command"
               debug "unknown command ${request.JSON.command}"
           }
-          
+
           commandData.command = request.JSON.command
           debug "with vendorDevice ${vendorDevice} for ${groovy.json.JsonOutput.toJson(commandData)}"
 
