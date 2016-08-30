@@ -23,7 +23,7 @@ import groovy.transform.Field
  
 private getVendorName()       { "Pisanobot" }
 private getVendorIcon()       { "http://i.imgur.com/BjTfDYk.png" }
-private apiUrl()              { appSettings.apiUrl ?: "http://smartthings.pisano.org/" }
+private apiUrl()              { appSettings.apiUrl ?: "http://smartthings.pisano.org/api" }
 private getVendorAuthPath()   { appSettings.vendorAuthPath ?: "http://smartthings.pisano.org/authorize" }
 private getVendorTokenPath()  { appSettings.vendorTokenPath ?: "http://smartthings.pisano.org/access_token" }
  
@@ -33,9 +33,9 @@ definition(
     author: "Christopher Pisano",
     description: "Post things to a WebService",
     category: "SmartThings Labs",
-    iconUrl: "http://i.imgur.com/BjTfDYk.png",
-    iconX2Url: "http://i.imgur.com/BjTfDYk.png",
-    iconX3Url: "http://i.imgur.com/BjTfDYk.png")
+    iconUrl: "https://static-s.aa-cdn.net/img/ios/899550793/3c56aeea7cfdb1fe18eaad6a89ea8c40",
+    iconX2Url: "https://static-s.aa-cdn.net/img/ios/899550793/3c56aeea7cfdb1fe18eaad6a89ea8c40",
+    iconX3Url: "https://static-s.aa-cdn.net/img/ios/899550793/3c56aeea7cfdb1fe18eaad6a89ea8c40")
 
 preferences {
   page(name: "welcomePage")
@@ -44,9 +44,6 @@ preferences {
 }
 
 mappings {
-  path("/oauthCode") {
-    action: [ GET: "getOauthCode" ]
-  }
   path("/message") {
     action: [ POST: "postMessage" ]
   }
@@ -59,7 +56,8 @@ mappings {
 }
 
 def getPing() {
-  return ["pong"]
+	log.debug "ping pong"
+  	return ["pong"]
 }
 
 def welcomePage() {
@@ -444,7 +442,7 @@ def createOAuthDevice() {
 
   try {
     httpPostJson(postParams) { response ->
-     log. debug "got new token for oAuth device ${response.data}"
+     //log. debug "got new token for oAuth device ${response.data}"
      //state.hub = response.data.uuid
      // state.vendorOAuthToken = response.data.token
     }
@@ -464,14 +462,18 @@ def getDevices() {
 }
 
 def post(path, body) {
+	
+    def url = "http://smartthings.pisano.org/api/smartthings${path}"
+
     try {
         
-        httpPostJson(uri: "http://smartthings.pisano.org", path: path,  body: body) {response ->
+        
+        httpPostJson(uri: url ,  body: body) {response ->
             //log.debug "POSTED $path"
         }
     
     } catch (Exception e) {
-        log.error "POSTED: $path $e"
+        log.error "POSTED: $url $e"
     }      
 }
 
@@ -521,7 +523,8 @@ def postEvent(name, device, value, description)
                  hub: '',
                  data: '',
                  zwave: '',
-                 description: description
+                 description: description,
+                 descriptionText: ''
              ]]) 
 }
 
@@ -602,27 +605,14 @@ def parseForecast(json)
 
 def weatherCheck(evt) {
 
-  def response = getWeatherFeature("conditions", "21212")
-    def forecastColor = parseForecast(response)
-    //log.debug "setting color to $forecastColor"
-   
-    color_control.each { object ->
-    
-      log.debug "${object.displayName} ${object.currentSwitch} ${forecastColor}"
-        object.on()
-        
-            def hueColor = 75
-        def saturation = 100
-            
-def newValue = [hue: hueColor, saturation: saturation, level: 100]  
-  log.debug "new value = $newValue"
+    def response = getWeatherFeature("conditions", "21212")
+    //def forecastColor = parseForecast(response)
 
-  object.setColor(newValue)            
+  	def temperature = response?.current_observation.temp_f;
     
-      //  object.setHue(100)
-       // object.setSaturation(100)
-    //  object.setColor(forecastColor) 
-    }
+    def value = temperature.toInteger()
+    postEvent('temperature', '22af7a10-6a42-11e6-bdf4-0800200c9a66', value, response?.current_observation.temperature_string)
+
 }
 
 def updateDeviceStatus() {
@@ -748,7 +738,17 @@ def updated() {
       log.debug "subscribed to thing ${thing.id}"
     }
   }
-  initialize()
+	initialize()
+}
+
+def initialize() {
+    weatherCheck()
+   runEvery1Hour(weatherCheck);
+   
+    
+  def noParams = getSunriseAndSunset()
+    log.debug "sunrise with no parameters: ${noParams.sunrise}"
+  log.debug "sunset with no parameters: ${noParams.sunset}"   
 }
 
 
@@ -778,7 +778,6 @@ def deviceEventHandler(evt) {
       "deviceId" : evt.deviceId,
       "hubId" : evt.hubId,
       "installedSmartAppId" : evt.installedSmartAppId,
-      "isoDate" : evt.isoDate,
       "isDigital" : evt.isDigital(),
       "isPhysical" : evt.isPhysical(),
       "isStateChange" : evt.isStateChange(),
@@ -792,26 +791,3 @@ def deviceEventHandler(evt) {
     ]])
 }
  
-def initialize() {
-    
-  def noParams = getSunriseAndSunset()
-    log.debug "sunrise with no parameters: ${noParams.sunrise}"
-  log.debug "sunset with no parameters: ${noParams.sunset}"
-       
-   // registerDevices()
-   // subscribeEvents()
-
-
-    weatherCheck()
-   // runEvery1Hour(updateDeviceStatus);
-   runEvery1Hour(weatherCheck);
-
-    //sendMessage("starting")
-    
-
-
-    //def pollingInterval = 1
-    //def ticklerSchedule = "0 0/${pollingInterval} * * * ?"    
-    
-    //schedule(ticklerSchedule, tickler)
-}
