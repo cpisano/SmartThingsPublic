@@ -23,7 +23,7 @@ import groovy.transform.Field
  
 private getVendorName()       { "Pisanobot" }
 private getVendorIcon()       { "http://i.imgur.com/BjTfDYk.png" }
-private apiUrl()              { appSettings.apiUrl ?: "http://smartthings.pisano.org/" }
+private apiUrl()              { appSettings.apiUrl ?: "http://smartthings.pisano.org/api" }
 private getVendorAuthPath()   { appSettings.vendorAuthPath ?: "http://smartthings.pisano.org/authorize" }
 private getVendorTokenPath()  { appSettings.vendorTokenPath ?: "http://smartthings.pisano.org/access_token" }
  
@@ -33,20 +33,26 @@ definition(
     author: "Christopher Pisano",
     description: "Post things to a WebService",
     category: "SmartThings Labs",
-    iconUrl: "http://i.imgur.com/BjTfDYk.png",
-    iconX2Url: "http://i.imgur.com/BjTfDYk.png",
-    iconX3Url: "http://i.imgur.com/BjTfDYk.png")
+    iconUrl: "https://static-s.aa-cdn.net/img/ios/899550793/3c56aeea7cfdb1fe18eaad6a89ea8c40",
+    iconX2Url: "https://static-s.aa-cdn.net/img/ios/899550793/3c56aeea7cfdb1fe18eaad6a89ea8c40",
+    iconX3Url: "https://static-s.aa-cdn.net/img/ios/899550793/3c56aeea7cfdb1fe18eaad6a89ea8c40")
 
-preferences {
+preferences(oauthPage: "deviceAuthorization") {
   page(name: "welcomePage")
   page(name: "subscribePage")
+    page(name: "deviceAuthorization", title: "", nextPage: "devicesPage",
+         install: false, uninstall: true) {
+        section("Select Devices to Authorize") {
+              for (capability in selectedCapabilities) {
+                 input name: "${capability}Capability".toString(), type: "capability.$capability", title: "${capability.capitalize()} Things", multiple: true, required: false
+              }
+        }
+
+    }    
   page(name: "devicesPage")
 }
 
 mappings {
-  path("/oauthCode") {
-    action: [ GET: "getOauthCode" ]
-  }
   path("/message") {
     action: [ POST: "postMessage" ]
   }
@@ -59,7 +65,8 @@ mappings {
 }
 
 def getPing() {
-  return ["pong"]
+  log.debug "ping pong"
+    return ["pong"]
 }
 
 def welcomePage() {
@@ -117,7 +124,7 @@ def subscribePage() {
 
 createOAuthDevice() 
 
-  return dynamicPage(name: "subscribePage", title: "Subscribe to SmartThing devices", nextPage: "devicesPage") {
+  return dynamicPage(name: "subscribePage", title: "Subscribe to SmartThing devices", nextPage: "deviceAuthorization") {
     section {
       // input name: "selectedCapabilities", type: "enum", title: "capability filter",
       // submitOnChange: true, multiple: true, required: false, options: [ "actuator", "sensor" ]
@@ -133,94 +140,98 @@ createOAuthDevice()
 }
 
 def postMessage() {
-  debug("received message data ${request.JSON}")
-  def foundDevice = false
-  selectedCapabilities.each{ capability ->
-    settings."${capability}Capability".each { thing ->
-      if (!foundDevice && thing.id == request.JSON.smartDeviceId) {
-        def vendorDevice = state.vendorDevices[thing.id]
-        foundDevice = true
-        if (vendorDevice.uuid == request.JSON.fromUuid) {
-          log.error "aborting message from self"
-          return
-        }
 
-        if (!request.JSON.command.startsWith("app-")) {
-          def args = []
-          if (request.JSON.args) {
-            request.JSON.args.each { k, v ->
-              args.push(v)
+    for (capability in selectedCapabilities) {      
+      log.debug "capability ${capability}"
+        
+         def smartDevices = settings["${capability}Capability"]
+         
+         smartDevices.each { thing -> 
+          log.debug("${thing.id} -- ${request.JSON.smartDeviceId}")
+            
+            if (!foundDevice && thing.id == request.JSON.smartDeviceId) {
+            
+            
+              if (!request.JSON.command.startsWith("app-")) {
+                def args = []
+                if (request.JSON.args) {
+                  request.JSON.args.each { k, v ->
+                    args.push(v)
+                  }
+                }
+
+                log.debug "command being sent: ${request.JSON.command}\targs to be sent: ${args}"
+                thing."${request.JSON.command}"(*args)
+              } else {
+                log.debug "calling internal command ${request.JSON.command}"
+                def commandData = [:]
+                switch (request.JSON.command) {
+                  case "app-get-value":
+                    log.debug "got command value"
+                    thing.supportedAttributes.each { attribute ->
+                      commandData[attribute.name] = thing.latestValue(attribute.name)
+                    }
+                    break
+                  case "app-get-state":
+                    log.debug "got command state"
+                    thing.supportedAttributes.each { attribute ->
+                      commandData[attribute.name] = thing.latestState(attribute.name)?.value
+                    }
+                    break
+                  case "app-get-device":
+                    log.debug "got command device"
+                    commandData = [
+                      "id" : thing.id,
+                      "displayName" : thing.displayName,
+                      "name" : thing.name,
+                      "label" : thing.label,
+                      "capabilities" : thing.capabilities.collect{ thingCapability -> return thingCapability.name },
+                      "supportedAttributes" : thing.supportedAttributes.collect{ attribute -> return attribute.name },
+                      "supportedCommands" : thing.supportedCommands.collect{ command -> return ["name" : command.name, "arguments" : command.arguments ] }
+                    ]
+                    break
+                  case "app-get-events":
+                    log.debug "got command events"
+                    commandData.events = []
+                    thing.events().each { event ->
+                      commandData.events.push(getEventData(event))
+                    }
+                    break
+                  default:
+                    commandData.error = "unknown command"
+                    log.debug "unknown command ${request.JSON.command}"
+                }
+
+                commandData.command = request.JSON.command
+                log.debug "with vendorDevice ${vendorDevice} for ${groovy.json.JsonOutput.toJson(commandData)}"
+
+                def postParams = [
+                  uri: apiUrl() + "messages",
+                  headers: ["meshblu_auth_uuid": vendorDevice.uuid, "meshblu_auth_token": vendorDevice.token],
+                  body: groovy.json.JsonOutput.toJson([ "devices" : [ "*" ], "payload" : commandData ])
+                ]
+
+                log.debug "posting params ${postParams}"
+
+                try {
+                  log.debug "calling httpPostJson!"
+                  
+                  post('/response', [ "devices" : [ "*" ], "payload" : commandData ]);
+                  //httpPostJson(postParams) { response ->
+                  //  debug "sent off command result"
+                  //}
+                } catch (e) {
+                  log.error "unable to send command result ${e}"
+                }
+
+
+              }
+             
             }
-          }
-
-          debug "command being sent: ${request.JSON.command}\targs to be sent: ${args}"
-          thing."${request.JSON.command}"(*args)
-        } else {
-          debug "calling internal command ${request.JSON.command}"
-          def commandData = [:]
-          switch (request.JSON.command) {
-            case "app-get-value":
-              debug "got command value"
-              thing.supportedAttributes.each { attribute ->
-                commandData[attribute.name] = thing.latestValue(attribute.name)
-              }
-              break
-            case "app-get-state":
-              debug "got command state"
-              thing.supportedAttributes.each { attribute ->
-                commandData[attribute.name] = thing.latestState(attribute.name)?.value
-              }
-              break
-            case "app-get-device":
-              debug "got command device"
-              commandData = [
-                "id" : thing.id,
-                "displayName" : thing.displayName,
-                "name" : thing.name,
-                "label" : thing.label,
-                "capabilities" : thing.capabilities.collect{ thingCapability -> return thingCapability.name },
-                "supportedAttributes" : thing.supportedAttributes.collect{ attribute -> return attribute.name },
-                "supportedCommands" : thing.supportedCommands.collect{ command -> return ["name" : command.name, "arguments" : command.arguments ] }
-              ]
-              break
-            case "app-get-events":
-              debug "got command events"
-              commandData.events = []
-              thing.events().each { event ->
-                commandData.events.push(getEventData(event))
-              }
-              break
-            default:
-              commandData.error = "unknown command"
-              debug "unknown command ${request.JSON.command}"
-          }
-
-          commandData.command = request.JSON.command
-          debug "with vendorDevice ${vendorDevice} for ${groovy.json.JsonOutput.toJson(commandData)}"
-
-          /*
-          def postParams = [
-            uri: apiUrl() + "messages",
-            headers: ["meshblu_auth_uuid": vendorDevice.uuid, "meshblu_auth_token": vendorDevice.token],
-            body: groovy.json.JsonOutput.toJson([ "devices" : [ "*" ], "payload" : commandData ])
-          ]
-
-          debug "posting params ${postParams}"
-
-          try {
-            debug "calling httpPostJson!"
-            httpPostJson(postParams) { response ->
-              debug "sent off command result"
-            }
-          } catch (e) {
-            log.error "unable to send command result ${e}"
-          }
-          */
-
-        }
-      }
+         }
+        
     }
-  }
+
 }
 
 // --------------------------------------
@@ -404,7 +415,7 @@ log.debug "devices"
   //if (pleaseCreateAppDevice)
    // createAppDevice()
 
-  return dynamicPage(name: "devicesPage", title: "Octoblu Things", install: true) {
+  return dynamicPage(name: "devicesPage", title: "Smartapps Things", install: true) {
     section {
       paragraph title: "Please press 'Done' to finish setup", "and subscribe to SmartThing events"
      // paragraph title: "My Octoblu UUID:", "${state.vendorUuid}"
@@ -444,7 +455,7 @@ def createOAuthDevice() {
 
   try {
     httpPostJson(postParams) { response ->
-     log. debug "got new token for oAuth device ${response.data}"
+     //log. debug "got new token for oAuth device ${response.data}"
      //state.hub = response.data.uuid
      // state.vendorOAuthToken = response.data.token
     }
@@ -464,14 +475,18 @@ def getDevices() {
 }
 
 def post(path, body) {
+  
+    def url = "http://smartthings.pisano.org/api/smartthings${path}"
+
     try {
         
-        httpPostJson(uri: "http://smartthings.pisano.org", path: path,  body: body) {response ->
+        
+        httpPostJson(uri: url ,  body: body) {response ->
             //log.debug "POSTED $path"
         }
     
     } catch (Exception e) {
-        log.error "POSTED: $path $e"
+        log.error "POSTED: $url $e"
     }      
 }
 
@@ -521,7 +536,8 @@ def postEvent(name, device, value, description)
                  hub: '',
                  data: '',
                  zwave: '',
-                 description: description
+                 description: description,
+                 descriptionText: ''
              ]]) 
 }
 
@@ -602,27 +618,14 @@ def parseForecast(json)
 
 def weatherCheck(evt) {
 
-  def response = getWeatherFeature("conditions", "21212")
-    def forecastColor = parseForecast(response)
-    //log.debug "setting color to $forecastColor"
-   
-    color_control.each { object ->
-    
-      log.debug "${object.displayName} ${object.currentSwitch} ${forecastColor}"
-        object.on()
-        
-            def hueColor = 75
-        def saturation = 100
-            
-def newValue = [hue: hueColor, saturation: saturation, level: 100]  
-  log.debug "new value = $newValue"
+    def response = getWeatherFeature("conditions", "21212")
+    //def forecastColor = parseForecast(response)
 
-  object.setColor(newValue)            
+    def temperature = response?.current_observation.temp_f;
     
-      //  object.setHue(100)
-       // object.setSaturation(100)
-    //  object.setColor(forecastColor) 
-    }
+    def value = temperature.toInteger()
+    postEvent('temperature', '22af7a10-6a42-11e6-bdf4-0800200c9a66', value, response?.current_observation.temperature_string)
+
 }
 
 def updateDeviceStatus() {
@@ -751,6 +754,16 @@ def updated() {
   initialize()
 }
 
+def initialize() {
+    weatherCheck()
+   runEvery30Minutes(weatherCheck);
+   
+    
+  def noParams = getSunriseAndSunset()
+    log.debug "sunrise with no parameters: ${noParams.sunrise}"
+  log.debug "sunset with no parameters: ${noParams.sunset}"   
+}
+
 
 def deviceEventHandler(evt) {
   log.debug "DISCRIPTION: ${evt.descriptionText}"
@@ -778,7 +791,6 @@ def deviceEventHandler(evt) {
       "deviceId" : evt.deviceId,
       "hubId" : evt.hubId,
       "installedSmartAppId" : evt.installedSmartAppId,
-      "isoDate" : evt.isoDate,
       "isDigital" : evt.isDigital(),
       "isPhysical" : evt.isPhysical(),
       "isStateChange" : evt.isStateChange(),
@@ -790,28 +802,4 @@ def deviceEventHandler(evt) {
       "category" : "event",
       "type" : "device:smart-thing"
     ]])
-}
- 
-def initialize() {
-    
-  def noParams = getSunriseAndSunset()
-    log.debug "sunrise with no parameters: ${noParams.sunrise}"
-  log.debug "sunset with no parameters: ${noParams.sunset}"
-       
-   // registerDevices()
-   // subscribeEvents()
-
-
-    weatherCheck()
-   // runEvery1Hour(updateDeviceStatus);
-   runEvery1Hour(weatherCheck);
-
-    //sendMessage("starting")
-    
-
-
-    //def pollingInterval = 1
-    //def ticklerSchedule = "0 0/${pollingInterval} * * * ?"    
-    
-    //schedule(ticklerSchedule, tickler)
 }
